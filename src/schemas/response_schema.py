@@ -6,3 +6,4 @@ class ResponseSchema(TypedDict):
     evaluation_state: Literal["True", "False"]
     retry_count: int
     instruction: str
+    data_source: Literal["sql", "retriever", ""]

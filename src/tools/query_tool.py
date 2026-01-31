@@ -3,6 +3,7 @@ from src.utils.vector_db.vector_store_singleton import VectorStoreSingleton
 from langchain_huggingface import HuggingFaceEmbeddings
 from src.utils.vector_db.loader_strategies.local_loader import LocalLoader
 from src.utils.vector_db.index_strategies.pinecone_vector_index import PineconeVectorIndex
+from src.settings import NAMESPACE
 
 
 @tool
@@ -28,7 +29,7 @@ def get_context(query_text: str) -> str:
         vector_index_strategy=vector_index_strategy,
     )
 
-    result = vector_store.query(query_text = query_text)
+    result = vector_store.query(query_text = query_text, namespace=NAMESPACE)
     return result
 
 if __name__ == "__main__":

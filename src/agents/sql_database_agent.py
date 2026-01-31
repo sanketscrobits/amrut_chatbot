@@ -12,6 +12,7 @@ from langchain.agents import create_agent
 from src.utils.db_connection import get_supabase_db
 from src.utils.llm_singleton import get_llm
 from src.utils.yaml_loader import load_prompts
+from src.schemas.response_schema import ResponseSchema
 
 def create_sql_agent(model: str = "gemini-2.5-flash", temperature: float = 0):
     """
@@ -61,6 +62,45 @@ def query_database(question: str, agent=None):
         
     return content.strip() if hasattr(content, 'strip') else content
 
+def sql_agent_node(state: ResponseSchema) -> ResponseSchema:
+    """
+    Workflow node function for SQL database agent.
+    Attempts to answer the user query using Supabase data.
+    """
+    user_query = state["user_query"]
+    instruction = state.get("instruction", "")
+    
+    # Combine query and instruction (weather info)
+    # instructions usually contain weather info like "[Context: Weather...]"
+    full_query = f"{user_query} {instruction}" if instruction else user_query
+    
+    try:
+        response = query_database(full_query)
+        
+        # Check if we got a meaningful answer (not "I don't know" or empty)
+        # Also check if response indicates failure to find info
+        response_lower = response.lower()
+        has_answer = bool(response) and "i don't know" not in response_lower and "no information" not in response_lower
+        
+        return {
+            "user_query": user_query,
+            "query_response": response if has_answer else "",
+            "evaluation_state": "",
+            "retry_count": state.get("retry_count", 0),
+            "instruction": instruction,
+            "data_source": "sql" if has_answer else ""
+        }
+    except Exception as e:
+        # On error, return empty response (will fallback to retriever)
+        print(f"SQL Agent Error: {e}")
+        return {
+            "user_query": user_query,
+            "query_response": "",
+            "evaluation_state": "",
+            "retry_count": state.get("retry_count", 0),
+            "instruction": instruction,
+            "data_source": ""
+        }
 
 if __name__ == "__main__":
     print("Testing Structured SQL Database Agent...")

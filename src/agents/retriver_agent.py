@@ -8,9 +8,9 @@ query_agent = create_query_agent(api_key=GOOGLE_API_KEY)
 def retriver_agent(state: ResponseSchema) -> ResponseSchema:
     user_query = state["user_query"]
     instruction = state["instruction"]
-    modified_input = {"input": f"{user_query}\n\n{instruction}" if instruction else user_query}
-    result = query_agent.invoke({"input": modified_input})
-    response_str = result["output"]
+    prompt_text = f"{user_query}\n\n{instruction}" if instruction else user_query
+    result = query_agent.invoke({"messages": [{"role": "user", "content": prompt_text}]})
+    response_str = result["messages"][-1].content
 
     return {
         "user_query": user_query,

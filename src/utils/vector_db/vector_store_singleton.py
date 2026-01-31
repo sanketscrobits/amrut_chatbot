@@ -40,11 +40,10 @@ class VectorStoreSingleton():
         return self.vector_store
 
 
-    def query(self, query_text: str):
+    def query(self, query_text: str, namespace: str = None):
         # HuggingFaceEmbeddings from langchain exposes embed_query for single strings
         query_embedding = self.embeddings_model.embed_query(query_text)
         """The main query method."""
-        if self.vector_store is None:
-            self._build_vectorstore()
-        results = self.vector_index_strategy.semantic_search(embeded_query=query_embedding)
+        # We don't need to auto-build vectorstore anymore as we rely on uploaded data
+        results = self.vector_index_strategy.semantic_search(embeded_query=query_embedding, namespace=namespace)
         return results
