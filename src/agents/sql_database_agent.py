@@ -69,16 +69,12 @@ def sql_agent_node(state: ResponseSchema) -> ResponseSchema:
     """
     user_query = state["user_query"]
     instruction = state.get("instruction", "")
-    
-    # Combine query and instruction (weather info)
-    # instructions usually contain weather info like "[Context: Weather...]"
-    full_query = f"{user_query} {instruction}" if instruction else user_query
+    weather_info = state.get("weather_info", "")
     
     try:
-        response = query_database(full_query)
+        response = query_database(user_query)
         
         # Check if we got a meaningful answer (not "I don't know" or empty)
-        # Also check if response indicates failure to find info
         response_lower = response.lower()
         has_answer = bool(response) and "i don't know" not in response_lower and "no information" not in response_lower
         
@@ -88,7 +84,9 @@ def sql_agent_node(state: ResponseSchema) -> ResponseSchema:
             "evaluation_state": "",
             "retry_count": state.get("retry_count", 0),
             "instruction": instruction,
-            "data_source": "sql" if has_answer else ""
+            "data_source": "sql" if has_answer else "",
+            "weather_info": weather_info,
+            "needs_escalation": False
         }
     except Exception as e:
         # On error, return empty response (will fallback to retriever)
@@ -99,7 +97,9 @@ def sql_agent_node(state: ResponseSchema) -> ResponseSchema:
             "evaluation_state": "",
             "retry_count": state.get("retry_count", 0),
             "instruction": instruction,
-            "data_source": ""
+            "data_source": "",
+            "weather_info": weather_info,
+            "needs_escalation": False
         }
 
 if __name__ == "__main__":

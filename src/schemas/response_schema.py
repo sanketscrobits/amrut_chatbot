@@ -7,3 +7,5 @@ class ResponseSchema(TypedDict):
     retry_count: int
     instruction: str
     data_source: Literal["sql", "retriever", ""]
+    weather_info: str  # Store weather data separately, append only when answer found
+    needs_escalation: bool  # Flag to trigger admin escalation
