@@ -24,20 +24,16 @@ class VectorStoreSingleton():
             self.chunker = semantic_chunker
             self._initialized = True 
 
-    def _build_vectorstore(self):
-        """Orchestrates the document loading and vector store creation."""
-        if self.vector_store is None:
-            print("--- Building Vector Store ---")
-
-            documents_markdown = self.document_loader_strategy.load_documents(path = path)
-
-            # Build or load the backing vector index using provided embeddings
-            self.vector_store = self.vector_index_strategy.create_or_load_vector_index(
-                documents_markdown,
-                chunker=self.chunker
-            )
-            print("--- Vector Store Built Successfully ---")
-        return self.vector_store
+    def ingest_document(self, text: str, namespace: str = None, source: str = "uploaded_file"):
+        """Ingests a document text into the vector store for a specific namespace."""
+        print(f"--- Ingesting Document for Namespace: {namespace} ---")
+        self.vector_index_strategy.create_or_load_vector_index(
+            text,
+            chunker=self.chunker,
+            namespace=namespace,
+            source=source
+        )
+        print("--- Document Ingested Successfully ---")
 
 
     def query(self, query_text: str, namespace: str = None):
@@ -47,3 +43,6 @@ class VectorStoreSingleton():
         # We don't need to auto-build vectorstore anymore as we rely on uploaded data
         results = self.vector_index_strategy.semantic_search(embeded_query=query_embedding, namespace=namespace)
         return results
+    def delete_document(self, source: str, namespace: str = None):
+        """Deletes all documents matching the source UUID."""
+        return self.vector_index_strategy.delete_by_source(source=source, namespace=namespace)

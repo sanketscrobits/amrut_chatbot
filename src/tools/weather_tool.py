@@ -1,10 +1,9 @@
 import os
 import requests
-import ast
 import re
 from typing import Optional, Tuple, Dict, Any, List
 from langchain.tools import tool
-from src.agents.sql_database_agent import create_sql_agent
+from src.utils.db_connection import get_supabase_db
 
 class WeatherTool:
     def __init__(self, api_key: Optional[str] = None):
@@ -25,54 +24,51 @@ class WeatherTool:
             
         if not self.api_key:
             print("Warning: OPENWEATHER_API_KEY not set in environment or settings.")
-            
-        # Initialize SQL Agent for coordinate lookup
-        self.sql_agent = create_sql_agent()
 
     def get_coordinates_from_supabase(self, location_name: str) -> Optional[Tuple[float, float]]:
         """
-        Query Supabase to get latitude and longitude for a location using the SQL Agent.
+        Query Supabase to get latitude and longitude for a location.
         """
         try:
-            # Ask the SQL agent to find coordinates
-            query = f"What are the latitude and longitude coordinates for {location_name}? Return only the numbers."
+            db = get_supabase_db()
             
-            # Invoke the agent
-            result = self.sql_agent.invoke({"messages": [("user", query)]})
-            content = result["messages"][-1].content
+            # Sanitize input roughly to prevent simple injection if not parameterized
+            # SQLDatabase.run typically takes raw SQL. 
+            # Ideally we should use parameterization if supported by the underlying driver via run logic
+            # or just be careful. For now, we'll strip special chars.
+            clean_location = location_name.replace("'", "").replace(";", "").strip()
             
-            # Handle list content (multimodal) if necessary
-            text_response = ""
-            if isinstance(content, list):
-                for part in content:
-                    if isinstance(part, dict) and part.get("type") == "text":
-                        text_response += part.get("text", "")
-                    elif isinstance(part, str):
-                        text_response += part
-            else:
-                text_response = str(content)
-                
-            print(f"DEBUG: SQL Agent Response for coords: {text_response}")
+            # Construct query to find location case-insensitively
+            query = f"SELECT lat, lng FROM districts WHERE name_en ILIKE '%{clean_location}%' LIMIT 1"
             
-            # Verify if the response contains "don't know" or similar failure
-            if "don't know" in text_response.lower() or "no information" in text_response.lower():
+            # Execute query
+            print(f"DEBUG: Executing query: {query}")
+            # db.run returns the string representation of the result
+            result_str = db.run(query) 
+            print(f"DEBUG: Query result: {result_str}")
+            
+            if not result_str or result_str == "[]":
+                print(f"Location '{location_name}' not found in Supabase.")
                 return None
                 
-            # Extract numbers using regex
-            # Looking for patterns like (21.46, 80.19) or just two float numbers
-            numbers = re.findall(r"[-+]?\d*\.\d+|\d+", text_response)
-            
-            if len(numbers) >= 2:
-                # Assuming first two numbers are lat and lon
-                lat = float(numbers[0])
-                lon = float(numbers[1])
-                print(f"DEBUG: Parsed coords: {lat}, {lon}")
-                return lat, lon
-            
+            # Parse the string result - handle Decimal objects by extracting numbers
+            # Result format: "[(Decimal('16.91'), Decimal('72.61'))]" or "[(16.91, 72.61)]"
+            try:
+                # Extract all numbers (including decimals) from the result string
+                numbers = re.findall(r"[-+]?\d*\.?\d+", result_str)
+                if len(numbers) >= 2:
+                    lat = float(numbers[0])
+                    lon = float(numbers[1])
+                    print(f"DEBUG: Found coords: {lat}, {lon}")
+                    return lat, lon
+            except Exception as parse_error:
+                print(f"Error parsing DB result '{result_str}': {parse_error}")
+                return None
+                
             return None
             
         except Exception as e:
-            print(f"Error fetching coordinates from Supabase via SQL Agent: {e}")
+            print(f"Error executing Supabase query for coordinates: {e}")
             return None
 
     def get_weather(self, lat: float, lon: float) -> Dict[str, Any]:
@@ -108,9 +104,12 @@ def check_weather(location: str) -> str:
         tool_instance = WeatherTool()
         
         # 1. Try to get coordinates from Supabase
+        # We strip the location to handle cases like "Pune "
         coords = tool_instance.get_coordinates_from_supabase(location.strip())
         
         if not coords:
+            # Fallback: We could return a message asking for specific coordinates or 
+            # maybe the location is just not in our tourist database.
             return f"I couldn't find the location '{location}' in our database to get its coordinates. Please try another location."
             
         lat, lon = coords
