@@ -3,7 +3,7 @@ from src.utils.vector_db.vector_store_singleton import VectorStoreSingleton
 from langchain_huggingface import HuggingFaceEmbeddings
 from src.utils.vector_db.loader_strategies.local_loader import LocalLoader
 from src.utils.vector_db.index_strategies.pinecone_vector_index import PineconeVectorIndex
-from src.settings import NAMESPACE
+from settings import NAMESPACE
 
 
 @tool
