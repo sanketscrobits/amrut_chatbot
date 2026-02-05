@@ -1,0 +1,44 @@
+============================= test session starts ==============================
+platform darwin -- Python 3.12.12, pytest-9.0.2, pluggy-1.6.0 -- /Users/nirajvaijinathmore/Desktop/work/amrut_chatbot/.venv/bin/python3
+cachedir: .pytest_cache
+rootdir: /Users/nirajvaijinathmore/Desktop/work/amrut_chatbot
+configfile: pyproject.toml
+plugins: anyio-4.12.1, locust-2.43.2, asyncio-1.3.0, langsmith-0.6.6, Faker-40.1.2
+asyncio: mode=Mode.STRICT, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collecting ... collected 10 items
+
+tests/production/test_full_workflow.py::TestFullWorkflow::test_01_health_check PASSED [ 10%]
+tests/production/test_full_workflow.py::TestFullWorkflow::test_02_upload_all_documents PASSED [ 20%]
+tests/production/test_full_workflow.py::TestFullWorkflow::test_03_query_all_documents FAILED [ 30%]
+tests/production/test_full_workflow.py::TestFullWorkflow::test_04_validate_query_accuracy PASSED [ 40%]
+tests/production/test_full_workflow.py::TestFullWorkflow::test_05_concurrent_queries PASSED [ 50%]
+tests/production/test_full_workflow.py::TestFullWorkflow::test_06_delete_all_documents PASSED [ 60%]
+tests/production/test_full_workflow.py::TestFullWorkflow::test_07_verify_cleanup PASSED [ 70%]
+tests/production/test_full_workflow.py::TestErrorHandling::test_invalid_file_upload PASSED [ 80%]
+tests/production/test_full_workflow.py::TestErrorHandling::test_empty_query PASSED [ 90%]
+tests/production/test_full_workflow.py::TestErrorHandling::test_very_long_query PASSED [100%]
+
+=================================== FAILURES ===================================
+_________________ TestFullWorkflow.test_03_query_all_documents _________________
+tests/production/test_full_workflow.py:72: in test_03_query_all_documents
+    assert "dont know" not in data['response'].lower() or not data.get('escalation_required', True), \
+E   AssertionError: Query failed to retrieve info: What are common side effects?
+E   assert ('dont know' not in 'i dont know...th an admin?'
+E     
+E     'dont know' is contained here:
+E       i dont know the answer to your question. would you like to connect with an admin?
+E     ?   +++++++++ or not True)
+E    +  where True = <built-in method get of dict object at 0x10c51fc40>('escalation_required', True)
+E    +    where <built-in method get of dict object at 0x10c51fc40> = {'escalation_id': 'a88afe73-5d3f-4bd7-ac59-4dd1bc8ef5f1', 'escalation_required': True, 'response': 'I dont know the answer to your question. Would you like to connect with an admin?', 'websocket_url': '/ws/escalation/a88afe73-5d3f-4bd7-ac59-4dd1bc8ef5f1/user'}.get
+----------------------------- Captured stdout call -----------------------------
+✅ Query answered: What is the data encryption policy?...
+✅ Query answered: How is patient data protected?...
+✅ Query answered: What compliance standards do you follow?...
+✅ Query answered: What is the privacy contact information?...
+✅ Query answered: What documents do I need for registration?...
+✅ Query answered: What happens during the first appointment?...
+✅ Query answered: How do I complete the onboarding process?...
+✅ Query answered: What is the onboarding contact email?...
+=========================== short test summary info ============================
+FAILED tests/production/test_full_workflow.py::TestFullWorkflow::test_03_query_all_documents
+=================== 1 failed, 9 passed in 240.59s (0:04:00) ====================

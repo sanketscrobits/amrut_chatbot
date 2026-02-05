@@ -1,7 +1,7 @@
 from src.utils.vector_db.loader_strategies.base import DocumentLoaderStrategy
 from src.utils.vector_db.index_strategies.base import VectorIndexStrategy
-from langchain_experimental.text_splitter import SemanticChunker
-path = r"F:\ScroBits_Tech\Query-Agent\documents\MIREMS.pdf"
+from langchain_text_splitters import RecursiveCharacterTextSplitter  # Fixed import
+path = r"F:\\ScroBits_Tech\\Query-Agent\\documents\\MIREMS.pdf"
 
 class VectorStoreSingleton():
     _instance = None
@@ -18,10 +18,19 @@ class VectorStoreSingleton():
             self.embeddings_model = embeddings_model
             self.document_loader_strategy = document_loader_strategy
             self.vector_index_strategy = vector_index_strategy
-            self.text_splitter = SemanticChunker(embeddings_model, breakpoint_threshold_type="percentile")
-            def semantic_chunker(markdown_text: str):
+            
+            # Use fixed-size chunking with overlap for better retrieval consistency
+            self.text_splitter = RecursiveCharacterTextSplitter(
+                chunk_size=512,  # Fixed size for consistency
+                chunk_overlap=50,  # Overlap to preserve context at boundaries
+                length_function=len,
+                separators=["\n\n", "\n", ". ", "! ", "? ", ", ", " ", ""]
+            )
+            
+            def fixed_chunker(markdown_text: str):
                 return self.text_splitter.create_documents([markdown_text])
-            self.chunker = semantic_chunker
+            
+            self.chunker = fixed_chunker
             self._initialized = True 
 
     def ingest_document(self, text: str, namespace: str = None, source: str = "uploaded_file"):
@@ -37,7 +46,7 @@ class VectorStoreSingleton():
 
 
     def query(self, query_text: str, namespace: str = None):
-        """The main query method."""
+        """The main query method with hybrid search support."""
         print(f"\n=== VECTOR_STORE.QUERY CALLED ===")
         print(f"Query text: {query_text}")
         print(f"Namespace: {namespace}")
@@ -47,8 +56,12 @@ class VectorStoreSingleton():
         print(f"Embedding generated: length={len(query_embedding)}")
         print(f"Calling semantic_search on: {type(self.vector_index_strategy).__name__}")
         
-        # We don't need to auto-build vectorstore anymore as we rely on uploaded data
-        results = self.vector_index_strategy.semantic_search(embeded_query=query_embedding, namespace=namespace)
+        # Pass both embedding and raw text for hybrid search
+        results = self.vector_index_strategy.semantic_search(
+            embeded_query=query_embedding,
+            namespace=namespace,
+            query_text=query_text  # Enable hybrid search
+        )
         
         print(f"Results from semantic_search: {results[:100] if results else 'EMPTY'}...")
         print(f"=== VECTOR_STORE.QUERY COMPLETE ===\n")

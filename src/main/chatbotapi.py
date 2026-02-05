@@ -1,6 +1,6 @@
 from fastapi import FastAPI, HTTPException, WebSocket
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 from typing import Optional
 from src.Workflow.workflow import workflow
 import re
@@ -18,9 +18,22 @@ from src.routers.upload_router import upload_router
 
 app = FastAPI(title="Amrut Chatbot API", description="Chatbot with admin escalation support")
 
+# Query validation constants
+MAX_QUERY_LENGTH = 5000
+MIN_QUERY_LENGTH = 1
+
 
 class ChatRequest(BaseModel):
     user_message: str
+    
+    @field_validator('user_message')
+    @classmethod
+    def validate_message(cls, v):
+        if not v or not v.strip():
+            raise ValueError("Query cannot be empty. Please provide a valid question.")
+        if len(v) > MAX_QUERY_LENGTH:
+            raise ValueError(f"Query too long ({len(v)} chars). Maximum length: {MAX_QUERY_LENGTH} characters.")
+        return v
 
 class ChatResponse(BaseModel):
     response: str
@@ -49,6 +62,21 @@ async def chatbot_endpoint(request: ChatRequest):
     
     try:
         user_input = request.user_message
+        
+        # Validate query is not empty
+        if not user_input or not user_input.strip():
+            raise HTTPException(
+                status_code=400,
+                detail="Query cannot be empty. Please provide a valid question."
+            )
+        
+        # Validate query length
+        if len(user_input) > MAX_QUERY_LENGTH:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Query too long ({len(user_input)} chars). Maximum length: {MAX_QUERY_LENGTH} characters."
+            )
+        
         print(f"User message: {user_input}")
 
         initial_state = {
@@ -110,6 +138,8 @@ async def chatbot_endpoint(request: ChatRequest):
         
         return ChatResponse(response=answer)
 
+    except HTTPException:
+        raise
     except Exception as e:
         print("Error in /chatbot:", e)
         raise HTTPException(status_code=500, detail=str(e))

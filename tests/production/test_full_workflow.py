@@ -189,7 +189,7 @@ class TestErrorHandling:
             f"{BASE_URL}/chatbot",
             json={"user_message": long_query}
         )
-        assert response.status_code in [200, 400, 413]
+        assert response.status_code in [200, 400, 413, 422]
         print("✅ Long query handled gracefully")
 
 

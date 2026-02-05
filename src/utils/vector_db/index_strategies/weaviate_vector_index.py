@@ -176,67 +176,152 @@ class WeaviateVectorIndex(VectorIndexStrategy):
         self.__collection = True
         return self
     
-    def semantic_search(self, embeded_query: list[float], namespace: str = None) -> str:
+    def keyword_search(self, query_text: str, namespace: str = None, limit: int = 10):
         """
-        Perform semantic search using an embedded query.
+        Perform BM25 keyword search.
         
         Args:
-            embeded_query: The embedded query vector
+            query_text: The raw query string
             namespace: Optional namespace to search within
+            limit: Maximum number of results
             
         Returns:
-            The most relevant context string
+            List of matching objects with scores
         """
         try:
             collection = self.__client.collections.get(self.__collection_name)
             
-            # Build query with optional namespace filter
+            # Build BM25 query with optional namespace filter
             if namespace:
-                response = collection.query.near_vector(
+                response = collection.query.bm25(
+                    query=query_text,
+                    limit=limit,
+                    return_metadata=["score"],
+                    filters=Filter.by_property("namespace").equal(namespace)
+                )
+            else:
+                response = collection.query.bm25(
+                    query=query_text,
+                    limit=limit,
+                    return_metadata=["score"]
+                )
+            
+            return response.objects
+        except Exception as e:
+            print(f"Warning: BM25 search failed: {e}")
+            return []
+    
+    def hybrid_rank_fusion(self, vector_results, keyword_results, k=60):
+        """
+        Combine vector and keyword search results using reciprocal rank fusion.
+        
+        Args:
+            vector_results: Results from vector search with (object, score) tuples
+            keyword_results: Results from BM25 search
+            k: Constant for rank fusion (default 60)
+            
+        Returns:
+            Combined and reranked results
+        """
+        scores = {}
+        
+        # Add vector search scores
+        for rank, (obj, score) in enumerate(vector_results, 1):
+            chunk_text = obj.properties.get("chunk_text", "")
+            if chunk_text:
+                scores[chunk_text] = scores.get(chunk_text, 0) + (1.0 / (k + rank))
+        
+        # Add keyword search scores  
+        for rank, obj in enumerate(keyword_results, 1):
+            chunk_text = obj.properties.get("chunk_text", "")
+            if chunk_text:
+                scores[chunk_text] = scores.get(chunk_text, 0) + (1.0 / (k + rank))
+        
+        # Sort by combined score
+        ranked = sorted(scores.items(), key=lambda x: x[1], reverse=True)
+        return ranked
+    
+    def semantic_search(self, embeded_query: list[float], namespace: str = None, query_text: str = None) -> str:
+        """
+        Perform HYBRID search using both vector similarity and BM25 keyword matching.
+        
+        Args:
+            embeded_query: The embedded query vector
+            namespace: Optional namespace to search within
+            query_text: Raw query text for keyword search (optional but recommended)
+            
+        Returns:
+            The most relevant context string
+        """
+        print(f"\n=== WEAVIATE HYBRID SEARCH ===")
+        print(f"Namespace: {namespace}")
+        
+        try:
+            collection = self.__client.collections.get(self.__collection_name)
+            
+            # 1. Vector search
+            if namespace:
+                vector_response = collection.query.near_vector(
                     near_vector=embeded_query,
                     limit=20,
                     return_metadata=["distance"],
                     filters=Filter.by_property("namespace").equal(namespace)
                 )
             else:
-                response = collection.query.near_vector(
+                vector_response = collection.query.near_vector(
                     near_vector=embeded_query,
                     limit=20,
                     return_metadata=["distance"]
                 )
             
-            print(f"\n=== WEAVIATE SEARCH: {len(response.objects)} results returned ===")
+            print(f"Vector search: {len(vector_response.objects)} results")
             
-            if response.objects:
-                # Convert distance to similarity score (Weaviate uses distance metrics)
-                # For cosine distance: similarity = 1 - distance
-                # Filter results with score >= 0.7 (distance <= 0.3)
-                matches = []
-                all_scores = []
-                for i, obj in enumerate(response.objects):
-                    distance = obj.metadata.distance if obj.metadata.distance is not None else 1.0
-                    similarity = 1 - distance
-                    all_scores.append(similarity)
-                    if i < 3:
-                        print(f"  Result {i+1}: score={similarity:.4f}")
-                    if similarity >= 0.5:  # Lowered from 0.7 to allow more matches
-                        matches.append((obj, similarity))
+            # Convert to (object, similarity) tuples
+            vector_matches = []
+            for obj in vector_response.objects:
+                distance = obj.metadata.distance if obj.metadata.distance is not None else 1.0
+                similarity = 1 - distance
+                # Lower threshold to 0.4 for hybrid approach
+                if similarity >= 0.4:
+                    vector_matches.append((obj, similarity))
+            
+            print(f"Vector matches (>= 0.4): {len(vector_matches)}")
+            
+            # 2. Keyword search (if query_text provided)
+            keyword_results = []
+            if query_text:
+                keyword_results = self.keyword_search(query_text, namespace, limit=10)
+                print(f"Keyword search: {len(keyword_results)} results")
+            
+            # 3. Hybrid rank fusion
+            if keyword_results:
+                ranked = self.hybrid_rank_fusion(vector_matches, keyword_results)
+                print(f"Combined results: {len(ranked)} unique chunks")
                 
-                print(f"Matches above 0.5: {len(matches)}/{len(response.objects)}")
-                if all_scores:
-                    print(f"Best score: {max(all_scores):.4f}")
-                print(f"=== END WEAVIATE SEARCH ===\n")
-                
-                if matches:
-                    # Sort by similarity (highest first) and return top result
-                    matches.sort(key=lambda x: x[1], reverse=True)
-                    context = matches[0][0].properties.get("chunk_text", "")
-                    return context or "No relevant context found for the question."
-                return "No relevant context found for the question (low score)."
+                if ranked:
+                    # Return top result
+                    best_chunk = ranked[0][0]
+                    print(f"Best hybrid score: {ranked[0][1]:.4f}")
+                    print(f"=== END HYBRID SEARCH ===\n")
+                    return best_chunk
             else:
-                return "No relevant context found for the question."
+                # Fallback to vector-only
+                print("Keyword search unavailable, using vector-only")
+                if vector_matches:
+                    vector_matches.sort(key=lambda x: x[1], reverse=True)
+                    context = vector_matches[0][0].properties.get("chunk_text", "")
+                    print(f"Best vector score: {vector_matches[0][1]:.4f}")
+                    print(f"=== END HYBRID SEARCH ===\n")
+                    return context or "No relevant context found for the question."
+            
+            print(f"No matches found")
+            print(f"=== END HYBRID SEARCH ===\n")
+            return "No relevant context found for the question."
+            
         except Exception as e:
-            print(f"Error during semantic search: {e}")
+            print(f"Error during hybrid search: {e}")
+            import traceback
+            traceback.print_exc()
             return "Error retrieving context."
     
     def delete_by_source(self, source: str, namespace: str = None):

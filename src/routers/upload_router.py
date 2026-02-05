@@ -13,6 +13,10 @@ logger = logging.getLogger(__name__)
 
 upload_router = APIRouter(tags=["Upload"])
 
+# File upload validation constants
+ALLOWED_EXTENSIONS = {'.md', '.pdf', '.txt', '.doc', '.docx', '.csv', '.json'}
+MAX_FILE_SIZE = 10_000_000  # 10MB
+
 
 @upload_router.post("/upload/{uuid}")
 async def upload_document(uuid: str, file: UploadFile = File(...)):
@@ -24,11 +28,33 @@ async def upload_document(uuid: str, file: UploadFile = File(...)):
         if not NAMESPACE:
             raise HTTPException(status_code=500, detail="NAMESPACE not configured in settings.")
 
-        suffix = os.path.splitext(file.filename)[1]
+        # Validate file extension
+        suffix = os.path.splitext(file.filename)[1].lower()
+        if suffix not in ALLOWED_EXTENSIONS:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Unsupported file type '{suffix}'. Allowed types: {', '.join(ALLOWED_EXTENSIONS)}"
+            )
+        
+        # Read file content for validation
+        content = await file.read()
+        
+        # Validate file size
+        if len(content) > MAX_FILE_SIZE:
+            raise HTTPException(
+                status_code=413,
+                detail=f"File too large ({len(content)} bytes). Maximum size: {MAX_FILE_SIZE} bytes (10MB)"
+            )
+        
+        # Validate content is not empty
+        if len(content) == 0:
+            raise HTTPException(
+                status_code=400,
+                detail="File is empty. Please upload a file with content."
+            )
         
         # Save uploaded file to a temporary file
         with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
-            content = await file.read()
             tmp.write(content)
             tmp_path = tmp.name
 

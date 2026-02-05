@@ -101,7 +101,6 @@ graph.add_conditional_edges(
         "retriver_agent": "retriver_agent"
     }
 )
-
 # Retriever routing: answer found → response_enricher, no answer → evaluator (for escalation)
 graph.add_conditional_edges(
     "retriver_agent",
@@ -111,7 +110,6 @@ graph.add_conditional_edges(
         "evaluator_agent": "evaluator_agent"
     }
 )
-
 # Response enricher always goes to evaluator
 graph.add_edge('response_enricher', 'evaluator_agent')
 
