@@ -5,7 +5,12 @@ from typing import Optional
 from src.Workflow.workflow import workflow
 import re
 from settings import NAMESPACE
-from src.utils.vector_db.index_strategies.pinecone_vector_index import vector_store
+from src.utils.vector_db.vector_store_factory import create_vector_store
+from langchain_huggingface import HuggingFaceEmbeddings
+
+# Initialize vector store using factory pattern
+_embeddings = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
+vector_store = create_vector_store(embeddings=_embeddings)
 from src.utils.escalation_manager import (create_escalation,get_escalation,handle_websocket_chat,close_escalation_connections)
 # Import routers
 from src.routers.admin_router import admin_router

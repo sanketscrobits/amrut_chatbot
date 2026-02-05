@@ -9,7 +9,7 @@ This API provides an AI-powered chatbot with:
 
 **Base URL**: `http://localhost:8000` (or your deployed URL)
 
----
+---Now that the system is fully functional, I would like to conduct end-to-end testing to validate the entire workflow in a production-like environment. This will help ensure the system is robust under real production loads and identify and resolve any potential issues before deployment.
 
 ## 1. Chatbot Endpoints
 

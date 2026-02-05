@@ -8,7 +8,7 @@ if str(project_root) not in sys.path:
 
 from langchain_huggingface import HuggingFaceEmbeddings
 from src.utils.vector_db.loader_strategies.local_loader import LocalLoader
-from src.utils.vector_db.index_strategies.pinecone_vector_index import PineconeVectorIndex
+from src.utils.vector_db.vector_store_factory import create_vector_store
 from src.utils.vector_db.vector_store_singleton import VectorStoreSingleton
 from settings import NAMESPACE
 
@@ -17,7 +17,8 @@ class MyDocumentUploader:
         """Initialize the uploader with necessary strategies."""
         self.embeddings_model = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
         self.document_loader_strategy = LocalLoader()
-        self.vector_index_strategy = PineconeVectorIndex(embeddings=self.embeddings_model)
+        # Use factory pattern to create vector store based on VECTOR_DB_TYPE setting
+        self.vector_index_strategy = create_vector_store(embeddings=self.embeddings_model)
         
         self.vector_store = VectorStoreSingleton(
             embeddings_model=self.embeddings_model,

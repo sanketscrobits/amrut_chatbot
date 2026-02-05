@@ -26,12 +26,30 @@ def retriver_agent(state: ResponseSchema) -> ResponseSchema:
     instruction = state.get("instruction", "")
     weather_info = state.get("weather_info", "")
     
+    print(f"\n=== RETRIVER_AGENT CALLED ===")
+    print(f"User query: {user_query}")
+    print(f"Instruction: {instruction}")
+    
     prompt_text = f"{user_query}\n\n{instruction}" if instruction else user_query
+    print(f"Invoking query_agent with: {prompt_text[:100]}...")
+    
     result = query_agent.invoke({"messages": [{"role": "user", "content": prompt_text}]})
+    
+    print(f"Agent result keys: {result.keys()}")
+    print(f"Number of messages: {len(result.get('messages', []))}")
+    
+    # Print all messages to see tool calls
+    for i, msg in enumerate(result.get("messages", [])):
+        print(f"  Message {i}: role={getattr(msg, 'type', 'unknown')}, has_tool_calls={hasattr(msg, 'tool_calls')}")
+        if hasattr(msg, 'tool_calls') and msg.tool_calls:
+            print(f"    Tool calls: {[tc.get('name', 'unknown') for tc in msg.tool_calls]}")
     
     # Extract text from potentially multimodal response
     raw_content = result["messages"][-1].content
     response_str = extract_text_from_content(raw_content)
+    
+    print(f"Final response: {response_str[:200]}...")
+    print(f"=== RETRIVER_AGENT COMPLETE ===\n")
 
     return {
         "user_query": user_query,

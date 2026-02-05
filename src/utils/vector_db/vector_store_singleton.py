@@ -37,11 +37,21 @@ class VectorStoreSingleton():
 
 
     def query(self, query_text: str, namespace: str = None):
+        """The main query method."""
+        print(f"\n=== VECTOR_STORE.QUERY CALLED ===")
+        print(f"Query text: {query_text}")
+        print(f"Namespace: {namespace}")
+        
         # HuggingFaceEmbeddings from langchain exposes embed_query for single strings
         query_embedding = self.embeddings_model.embed_query(query_text)
-        """The main query method."""
+        print(f"Embedding generated: length={len(query_embedding)}")
+        print(f"Calling semantic_search on: {type(self.vector_index_strategy).__name__}")
+        
         # We don't need to auto-build vectorstore anymore as we rely on uploaded data
         results = self.vector_index_strategy.semantic_search(embeded_query=query_embedding, namespace=namespace)
+        
+        print(f"Results from semantic_search: {results[:100] if results else 'EMPTY'}...")
+        print(f"=== VECTOR_STORE.QUERY COMPLETE ===\n")
         return results
     def delete_document(self, source: str, namespace: str = None):
         """Deletes all documents matching the source UUID."""
