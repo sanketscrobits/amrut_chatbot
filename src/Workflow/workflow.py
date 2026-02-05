@@ -7,6 +7,7 @@ from src.agents.response_enricher import response_enricher_node
 from src.schemas.response_schema import ResponseSchema
 from src.agents.sql_database_agent import sql_agent_node
 from src.agents.weather_enricher import weather_enricher_node
+from src.agents.router_agent import router_agent_node
 
 model = ChatGoogleGenerativeAI(model="gemini-2.5-flash", google_api_key=GOOGLE_API_KEY)
 
@@ -27,13 +28,19 @@ def evaluation_edge(state: ResponseSchema):
     
     return END
 
+def intent_routing_edge(state: ResponseSchema):
+    """Route based on Intent Router decision."""
+    source = state.get("data_source", "retriever")
+    if source == "sql":
+        return "sql_agent"
+    return "retriver_agent"
 
 def sql_routing_edge(state: ResponseSchema):
     """Route based on whether SQL agent found an answer."""
+    # If SQL agent returned a valid response, go to enricher
     if state.get("query_response") and state.get("data_source") == "sql":
-        # SQL found answer, go to response enricher to add weather
         return "response_enricher"
-    # No answer from SQL, try vector DB
+    # Fallback to retriever
     return "retriver_agent"
 
 
@@ -80,19 +87,28 @@ graph = StateGraph(ResponseSchema)
 
 # Add nodes
 graph.add_node('weather_enricher', weather_enricher_node)
+graph.add_node('router_agent', router_agent_node)
 graph.add_node('sql_agent', sql_agent_node)
 graph.add_node('retriver_agent', retriver_agent)
 graph.add_node('response_enricher', response_enricher_node)
 graph.add_node('evaluator_agent', evaluator_agent)
 
 # Define edges
-# Start with weather enrichment
+# Start -> Weather -> Router
 graph.add_edge(START, 'weather_enricher')
+graph.add_edge('weather_enricher', 'router_agent')
 
-# Then go to SQL agent
-graph.add_edge('weather_enricher', 'sql_agent')
+# Router -> SQL or Retriever
+graph.add_conditional_edges(
+    "router_agent",
+    intent_routing_edge,
+    {
+        "sql_agent": "sql_agent",
+        "retriver_agent": "retriver_agent"
+    }
+)
 
-# SQL routing: answer found → response_enricher, no answer → retriver_agent
+# SQL Agent -> Response Enricher (Success) or Retriever (Fallback)
 graph.add_conditional_edges(
     "sql_agent",
     sql_routing_edge,
@@ -101,6 +117,7 @@ graph.add_conditional_edges(
         "retriver_agent": "retriver_agent"
     }
 )
+
 # Retriever routing: answer found → response_enricher, no answer → evaluator (for escalation)
 graph.add_conditional_edges(
     "retriver_agent",
@@ -110,6 +127,7 @@ graph.add_conditional_edges(
         "evaluator_agent": "evaluator_agent"
     }
 )
+
 # Response enricher always goes to evaluator
 graph.add_edge('response_enricher', 'evaluator_agent')
 

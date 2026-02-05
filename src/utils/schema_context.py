@@ -1,0 +1,132 @@
+DB_SCHEMA_CONTEXT = """
+CREATE TABLE categories (
+	id UUID DEFAULT gen_random_uuid() NOT NULL, 
+	name_en TEXT NOT NULL, 
+	name_mr TEXT NOT NULL, 
+	icon_name TEXT, 
+	created_at TIMESTAMP WITHOUT TIME ZONE DEFAULT now(), 
+	image_url TEXT, 
+	CONSTRAINT categories_pkey PRIMARY KEY (id), 
+	CONSTRAINT categories_name_en_key UNIQUE NULLS DISTINCT (name_en)
+)
+
+CREATE TABLE districts (
+	id UUID DEFAULT gen_random_uuid() NOT NULL, 
+	name_en TEXT NOT NULL, 
+	name_mr TEXT NOT NULL, 
+	slug TEXT NOT NULL, 
+	description_en TEXT, 
+	description_mr TEXT, 
+	lat NUMERIC(10, 8), 
+	lng NUMERIC(11, 8), 
+	population TEXT, 
+	area_km2 TEXT, 
+	tourist_highlights_en TEXT, 
+	tourist_highlights_mr TEXT, 
+	best_time_to_visit_en TEXT, 
+	best_time_to_visit_mr TEXT, 
+	image_url TEXT, 
+	created_at TIMESTAMP WITHOUT TIME ZONE DEFAULT now(), 
+	updated_at TIMESTAMP WITHOUT TIME ZONE DEFAULT now(), 
+	CONSTRAINT districts_pkey PRIMARY KEY (id), 
+	CONSTRAINT districts_slug_key UNIQUE NULLS DISTINCT (slug)
+)
+
+CREATE TABLE emergency_services (
+	id UUID DEFAULT gen_random_uuid() NOT NULL, 
+	district_id UUID NOT NULL, 
+	service_type TEXT NOT NULL, 
+	name TEXT NOT NULL, 
+	phone TEXT NOT NULL, 
+	address TEXT, 
+	lat NUMERIC(10, 8), 
+	lng NUMERIC(11, 8), 
+	available_24_7 BOOLEAN DEFAULT false, 
+	created_at TIMESTAMP WITHOUT TIME ZONE DEFAULT now(), 
+	updated_at TIMESTAMP WITHOUT TIME ZONE DEFAULT now(), 
+	CONSTRAINT emergency_services_pkey PRIMARY KEY (id), 
+	CONSTRAINT emergency_services_district_id_fkey FOREIGN KEY(district_id) REFERENCES districts (id) ON DELETE CASCADE
+)
+
+CREATE TABLE local_businesses (
+	id UUID DEFAULT gen_random_uuid() NOT NULL, 
+	user_id UUID, 
+	district_id UUID NOT NULL, 
+	category_id UUID NOT NULL, 
+	name_en TEXT NOT NULL, 
+	name_mr TEXT, 
+	description_en TEXT, 
+	description_mr TEXT, 
+	owner_name TEXT NOT NULL, 
+	email TEXT NOT NULL, 
+	phone TEXT NOT NULL, 
+	address TEXT NOT NULL, 
+	lat NUMERIC(10, 8), 
+	lng NUMERIC(11, 8), 
+	service_area_en TEXT, 
+	service_area_mr TEXT, 
+	website TEXT, 
+	social_media_links JSONB, 
+	image_url TEXT, 
+	verification_status TEXT DEFAULT 'pending'::text, 
+	created_at TIMESTAMP WITHOUT TIME ZONE DEFAULT now(), 
+	updated_at TIMESTAMP WITHOUT TIME ZONE DEFAULT now(), 
+	images JSONB DEFAULT '[]'::jsonb, 
+	brochure_url TEXT, 
+	amrut_certified BOOLEAN DEFAULT false, 
+	rejection_reason TEXT, 
+	business_owner_id UUID, 
+	CONSTRAINT local_businesses_pkey PRIMARY KEY (id), 
+	CONSTRAINT local_businesses_business_owner_id_fkey FOREIGN KEY(business_owner_id) REFERENCES business_owners (id) ON DELETE SET NULL, 
+	CONSTRAINT local_businesses_category_id_fkey FOREIGN KEY(category_id) REFERENCES categories (id) ON DELETE CASCADE, 
+	CONSTRAINT local_businesses_district_id_fkey FOREIGN KEY(district_id) REFERENCES districts (id) ON DELETE CASCADE, 
+	CONSTRAINT local_businesses_user_id_fkey FOREIGN KEY(user_id) REFERENCES auth.users (id) ON DELETE CASCADE
+)
+
+CREATE TABLE safety_alerts (
+	id UUID DEFAULT gen_random_uuid() NOT NULL, 
+	district_id UUID NOT NULL, 
+	title_en TEXT NOT NULL, 
+	title_mr TEXT NOT NULL, 
+	description_en TEXT NOT NULL, 
+	description_mr TEXT NOT NULL, 
+	severity TEXT NOT NULL, 
+	active BOOLEAN DEFAULT true, 
+	created_at TIMESTAMP WITHOUT TIME ZONE DEFAULT now(), 
+	updated_at TIMESTAMP WITHOUT TIME ZONE DEFAULT now(), 
+	CONSTRAINT safety_alerts_pkey PRIMARY KEY (id), 
+	CONSTRAINT safety_alerts_district_id_fkey FOREIGN KEY(district_id) REFERENCES districts (id) ON DELETE CASCADE, 
+	CONSTRAINT safety_alerts_severity_check CHECK (severity = ANY (ARRAY['low'::text, 'medium'::text, 'high'::text]))
+)
+
+CREATE TABLE tourist_places (
+	id UUID DEFAULT gen_random_uuid() NOT NULL, 
+	district_id UUID NOT NULL, 
+	category_id UUID NOT NULL, 
+	name_en TEXT NOT NULL, 
+	name_mr TEXT NOT NULL, 
+	description_en TEXT, 
+	description_mr TEXT, 
+	address TEXT, 
+	lat NUMERIC(10, 8), 
+	lng NUMERIC(11, 8), 
+	entry_fee TEXT, 
+	opening_hours_en TEXT, 
+	opening_hours_mr TEXT, 
+	phone TEXT, 
+	website TEXT, 
+	best_time_visit_en TEXT, 
+	best_time_visit_mr TEXT, 
+	image_url TEXT, 
+	verified BOOLEAN DEFAULT false, 
+	created_at TIMESTAMP WITHOUT TIME ZONE DEFAULT now(), 
+	updated_at TIMESTAMP WITHOUT TIME ZONE DEFAULT now(), 
+	images JSONB DEFAULT '[]'::jsonb, 
+	info_url TEXT, 
+	pdf_url TEXT, 
+	slug TEXT, 
+	CONSTRAINT tourist_places_pkey PRIMARY KEY (id), 
+	CONSTRAINT tourist_places_category_id_fkey FOREIGN KEY(category_id) REFERENCES categories (id) ON DELETE CASCADE, 
+	CONSTRAINT tourist_places_district_id_fkey FOREIGN KEY(district_id) REFERENCES districts (id) ON DELETE CASCADE
+)
+"""

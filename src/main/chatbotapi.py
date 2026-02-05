@@ -7,6 +7,8 @@ import re
 from settings import NAMESPACE
 from src.utils.vector_db.vector_store_factory import create_vector_store
 from langchain_huggingface import HuggingFaceEmbeddings
+from contextlib import asynccontextmanager
+from src.utils.db_connection import get_supabase_db
 
 # Initialize vector store using factory pattern
 _embeddings = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
@@ -16,7 +18,19 @@ from src.utils.escalation_manager import (create_escalation,get_escalation,handl
 from src.routers.admin_router import admin_router
 from src.routers.upload_router import upload_router
 
-app = FastAPI(title="Amrut Chatbot API", description="Chatbot with admin escalation support")
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Eagerly initialize DB connection to avoid cold start latency on first request
+    try:
+        print("Startup: Eagerly warming up Supabase connection...")
+        get_supabase_db()
+        print("Startup: Supabase connection warm.")
+    except Exception as e:
+        print(f"Startup Warning: Failed to warm up DB: {e}")
+    yield
+    # Cleanup if needed
+
+app = FastAPI(title="Amrut Chatbot API", description="Chatbot with admin escalation support", lifespan=lifespan)
 
 # Query validation constants
 MAX_QUERY_LENGTH = 5000

@@ -29,8 +29,21 @@ class SupabaseDBSingleton:
                 if "?" not in connection_uri and "&" in connection_uri:
                     connection_uri = connection_uri.replace("&", "?", 1)
             
+            # Whitelist specific tables to reduce schema reflection time
+            # This drastically improves startup and query planning time
+            # Optimization: Pass empty list to skip schema reflection (approx 16s).
+            # We use hardcoded schema context in agents or direct SQL queries.
+            RELEVANT_TABLES = []
+            
             try:
-                self._db = SQLDatabase.from_uri(connection_uri)
+                print(f"Initializing SQLDatabase (Reflection Disabled)")
+                import time
+                t0 = time.time()
+                self._db = SQLDatabase.from_uri(
+                    connection_uri,
+                    include_tables=RELEVANT_TABLES
+                )
+                print(f"SQLDatabase.from_uri took {time.time() - t0:.2f}s")
             except Exception as e:
                 raise ConnectionError(f"Failed to connect to Supabase: {str(e)}")
                 
