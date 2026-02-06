@@ -38,4 +38,5 @@ dependencies = [
     "python-multipart>=0.0.22",
     "redis>=7.1.0",
     "sse-starlette>=3.2.0",
+    "weaviate-client>=4.19.2",
 ]
