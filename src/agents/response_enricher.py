@@ -101,12 +101,7 @@ def response_enricher_node(state: ResponseSchema) -> ResponseSchema:
         enriched_response = query_response
     
     return {
-        "user_query": state["user_query"],
         "query_response": enriched_response,
-        "evaluation_state": state.get("evaluation_state", ""),
-        "retry_count": state.get("retry_count", 0),
-        "instruction": state.get("instruction", ""),
-        "data_source": state.get("data_source", ""),
-        "weather_info": weather_info,
-        "needs_escalation": state.get("needs_escalation", False)
     }
+
+

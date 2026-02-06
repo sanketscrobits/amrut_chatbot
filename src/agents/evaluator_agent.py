@@ -25,57 +25,41 @@ def check_needs_escalation(response: str) -> bool:
 
 
 def evaluator_agent(state: ResponseSchema) -> ResponseSchema:
-    user_query = state["user_query"]
+    user_input = state["validated_user_input"]
+
     query_response = state.get("query_response", "")
     weather_info = state.get("weather_info", "")
     data_source = state.get("data_source", "")
     
     if state.get("retry_count", 0) > 3:
         return {
-            "user_query": user_query,
             "query_response": "I don't know the answer to your question. Would you like to connect with an admin?",
             "evaluation_state": "True",
-            "instruction": "",
-            "retry_count": state.get("retry_count", 0),
-            "data_source": data_source,
-            "weather_info": weather_info,
             "needs_escalation": True  # Trigger escalation
         }
+
 
     # Check if response indicates no answer found
     if check_needs_escalation(query_response):
         return {
-            "user_query": user_query,
             "query_response": "I don't know the answer to your question. Would you like to connect with an admin?",
             "evaluation_state": "True",
-            "instruction": "",
-            "retry_count": state.get("retry_count", 0),
-            "data_source": data_source,
-            "weather_info": weather_info,
             "needs_escalation": True  # Trigger escalation
         }
+
 
     # Check for profanity using better-profanity
     if profanity.contains_profanity(query_response):
         retry_instruction = "Rephrase the response to be completely profanity-free. Avoid any explicit language, slurs, or direct quotes of offensive content. Summarize factually and neutrally."
         return {
-            "user_query": user_query,
-            "query_response": query_response,
             "evaluation_state": "False",
             "instruction": retry_instruction,
-            "retry_count": state.get("retry_count", 0),
-            "data_source": data_source,
-            "weather_info": weather_info,
             "needs_escalation": False
         }
+
     else:
         return {
-            "user_query": user_query,
-            "query_response": query_response,
             "evaluation_state": "True",
-            "instruction": "",
-            "retry_count": state.get("retry_count", 0),
-            "data_source": data_source,
-            "weather_info": weather_info,
             "needs_escalation": False
         }
+

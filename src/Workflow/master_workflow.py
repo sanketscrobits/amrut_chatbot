@@ -82,79 +82,60 @@ def retriever_routing_edge(state: ResponseSchema):
     return "evaluator_agent"
 
 
-# Build the graph
+from src.agents.pre_processor import pre_processor_node
+
+def atomic_workflow(state: ResponseSchema) -> ResponseSchema:
+    """
+    Executes the entire chatbot pipeline as a single atomic step.
+    This bypasses LanGraph state merging conflicts and reduces overhead.
+    """
+    # 1. Pre-processing (Weather + Router)
+    pre_res = pre_processor_node(state)
+    state.update(pre_res)
+    
+    # 2. Intent Routing & Data Retrieval
+    source = intent_routing_edge(state)
+    
+    if source == "sql_agent":
+        # Try SQL
+        sql_res = sql_agent_node(state)
+        state.update(sql_res)
+        
+        # FIX: Only fallback if SQL execution FAILED (not just empty results)
+        # Check for sql_empty_result marker to avoid unnecessary retriever calls
+        if not state.get("query_response") and not state.get("sql_empty_result"):
+            ret_res = retriver_agent(state)
+            state.update(ret_res)
+    else:
+        # Direct to Retriever
+        ret_res = retriver_agent(state)
+        state.update(ret_res)
+    
+    # 3. Response Enrichment
+    enr_res = response_enricher_node(state)
+    state.update(enr_res)
+    
+    # 4. Evaluation (Basic pass)
+    eval_res = evaluator_agent(state)
+    state.update(eval_res)
+    
+    return {
+        "query_response": state.get("query_response", ""),
+        "evaluation_state": state.get("evaluation_state", ""),
+        "retry_count": state.get("retry_count", 0),
+        "data_source": state.get("data_source", ""),
+        "weather_info": state.get("weather_info", ""),
+        "needs_escalation": state.get("needs_escalation", False)
+    }
+
+
+
+# Build the atomic graph
 graph = StateGraph(ResponseSchema)
-
-# Add nodes
-graph.add_node('weather_enricher', weather_enricher_node)
-graph.add_node('router_agent', router_agent_node)
-graph.add_node('sql_agent', sql_agent_node)
-graph.add_node('retriver_agent', retriver_agent)
-graph.add_node('response_enricher', response_enricher_node)
-graph.add_node('evaluator_agent', evaluator_agent)
-
-# Define edges
-# Start -> Weather -> Router
-graph.add_edge(START, 'weather_enricher')
-graph.add_edge('weather_enricher', 'router_agent')
-
-# Router -> SQL or Retriever
-graph.add_conditional_edges(
-    "router_agent",
-    intent_routing_edge,
-    {
-        "sql_agent": "sql_agent",
-        "retriver_agent": "retriver_agent"
-    }
-)
-
-# SQL Agent -> Response Enricher (Success) or Retriever (Fallback)
-graph.add_conditional_edges(
-    "sql_agent",
-    sql_routing_edge,
-    {
-        "response_enricher": "response_enricher",
-        "retriver_agent": "retriver_agent"
-    }
-)
-
-# Retriever routing: answer found → response_enricher, no answer → evaluator (for escalation)
-graph.add_conditional_edges(
-    "retriver_agent",
-    retriever_routing_edge,
-    {
-        "response_enricher": "response_enricher",
-        "evaluator_agent": "evaluator_agent"
-    }
-)
-
-# Response enricher always goes to evaluator
-graph.add_edge('response_enricher', 'evaluator_agent')
-
-# Evaluator routing: profanity retry → retriver_agent, pass/escalation → END
-graph.add_conditional_edges(
-    "evaluator_agent",
-    evaluation_edge,
-    {
-        "retriver_agent": "retriver_agent",
-        END: END
-    }
-)
+graph.add_node('atomic_chat', atomic_workflow)
+graph.add_edge(START, 'atomic_chat')
+graph.add_edge('atomic_chat', END)
 
 workflow = graph.compile()
 
-if __name__ == "__main__":
-    initial_state = {
-        "user_query": "tell me the tourist highlights in gondia?",
-        "query_response": "",
-        "evaluation_state": "",
-        "retry_count": 0,
-        "instruction": "",
-        "data_source": "",
-        "weather_info": "",
-        "needs_escalation": False
-    }
 
-    final_state = workflow.invoke(initial_state, config={"verbose": True})
-
-    print(final_state)

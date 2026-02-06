@@ -1,14 +1,15 @@
 from fastapi import FastAPI, HTTPException, WebSocket
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel, Field, field_validator
 from typing import Optional
-from src.Workflow.workflow import workflow
+from src.Workflow.master_workflow import workflow
 import re
 from settings import NAMESPACE
 from src.utils.vector_db.vector_store_factory import create_vector_store
 from langchain_huggingface import HuggingFaceEmbeddings
 from contextlib import asynccontextmanager
 from src.utils.db_connection import get_supabase_db
+from src.utils.response_cache import get_cached_response, cache_response
 
 # Initialize vector store using factory pattern
 _embeddings = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
@@ -92,9 +93,14 @@ async def chatbot_endpoint(request: ChatRequest):
             )
         
         print(f"User message: {user_input}")
+        
+        # RESPONSE CACHING: Check cache first
+        cached_response = get_cached_response(user_input)
+        if cached_response:
+            return ChatResponse(**cached_response)
 
         initial_state = {
-            "user_query": user_input,
+            "validated_user_input": user_input,
             "query_response": "",
             "evaluation_state": "",
             "retry_count": 0,
@@ -138,19 +144,29 @@ async def chatbot_endpoint(request: ChatRequest):
         answer = re.sub(r'\n+$', '', answer).strip()
 
         # Check if escalation is needed (from workflow state)
-        if final_state.get("needs_escalation", False):
+        needs_escalation = final_state.get("needs_escalation", False)
+        escalation_id = None
+        websocket_url = None
+
+        if needs_escalation:
             escalation = create_escalation(
                 user_question=user_input,
                 context=answer
             )
-            return ChatResponse(
-                response=answer,
-                escalation_required=True,
-                escalation_id=escalation["escalation_id"],
-                websocket_url=f"/ws/escalation/{escalation['escalation_id']}/user"
-            )
+            escalation_id = escalation["escalation_id"]
+            websocket_url = f"/ws/escalation/{escalation_id}/user"
         
-        return ChatResponse(response=answer)
+        response_data = {
+            "response": answer,
+            "escalation_required": needs_escalation,
+            "escalation_id": escalation_id,
+            "websocket_url": websocket_url
+        }
+        
+        # RESPONSE CACHING: Cache successful responses
+        cache_response(user_input, response_data)
+        
+        return ChatResponse(**response_data)
 
     except HTTPException:
         raise

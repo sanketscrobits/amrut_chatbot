@@ -37,3 +37,6 @@ WEAVIATE_COLLECTION_NAME = getenv("WEAVIATE_COLLECTION_NAME", "AmrutChatbotDocs"
 VECTOR_DB_TYPE = getenv("VECTOR_DB_TYPE", "weaviate")  # "pinecone" or "weaviate"
 
 NAMESPACE = getenv("NAMESPACE")
+
+# Performance & Debugging Configuration
+DEBUG_MODE = True

@@ -281,11 +281,11 @@ class WeaviateVectorIndex(VectorIndexStrategy):
             for obj in vector_response.objects:
                 distance = obj.metadata.distance if obj.metadata.distance is not None else 1.0
                 similarity = 1 - distance
-                # Lower threshold to 0.4 for hybrid approach
-                if similarity >= 0.4:
+                # Lower threshold to 0.35 for better retrieval accuracy
+                if similarity >= 0.35:
                     vector_matches.append((obj, similarity))
             
-            print(f"Vector matches (>= 0.4): {len(vector_matches)}")
+            print(f"Vector matches (>= 0.35): {len(vector_matches)}")
             
             # 2. Keyword search (if query_text provided)
             keyword_results = []
