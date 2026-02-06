@@ -1,9 +1,10 @@
 from src.schemas.response_schema import ResponseSchema
 from settings import GOOGLE_API_KEY
-from src.agents.query_agent import create_query_agent
+from src.tools.query_tool import get_context
+from langchain_google_genai import ChatGoogleGenerativeAI
 
-# Build the query agent once; uses the get_context tool under the hood
-query_agent = create_query_agent(api_key=GOOGLE_API_KEY)
+# Initialize LLM for answering based on context
+llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash", google_api_key=GOOGLE_API_KEY, temperature=0.1)
 
 
 def extract_text_from_content(content) -> str:
@@ -26,13 +27,31 @@ def retriver_agent(state: ResponseSchema) -> ResponseSchema:
     instruction = state.get("instruction", "")
     weather_info = state.get("weather_info", "")
     
-    prompt_text = f"{user_query}\n\n{instruction}" if instruction else user_query
-    result = query_agent.invoke({"messages": [{"role": "user", "content": prompt_text}]})
+    # Step 1: Directly get context from vector database
+    context = get_context.invoke(user_query)
+    print(f"DEBUG Retriever: Got context from Pinecone: {context[:200]}..." if context else "DEBUG Retriever: No context")
     
-    # Extract text from potentially multimodal response
-    raw_content = result["messages"][-1].content
-    response_str = extract_text_from_content(raw_content)
+    # Step 2: Check if meaningful context was found
+    no_context_patterns = ["no relevant context", "error retrieving"]
+    has_context = bool(context) and not any(p in context.lower() for p in no_context_patterns)
+    
+    if has_context:
+        # Step 3: Use LLM to answer BASED ON the context
+        prompt = f"""Answer the user's question based ONLY on the following context.
+If the context doesn't contain enough information to fully answer, provide what you can from the context.
 
+Context:
+{context}
+
+User Question: {user_query}
+
+Answer:"""
+        response = llm.invoke(prompt)
+        response_str = extract_text_from_content(response.content)
+    else:
+        # No context found
+        response_str = "Sorry, I am not able to help with this question. Please try asking something different."
+    
     return {
         "user_query": user_query,
         "query_response": response_str,
@@ -43,3 +62,4 @@ def retriver_agent(state: ResponseSchema) -> ResponseSchema:
         "weather_info": weather_info,
         "needs_escalation": False
     }
+

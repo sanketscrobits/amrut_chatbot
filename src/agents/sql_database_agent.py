@@ -75,8 +75,24 @@ def sql_agent_node(state: ResponseSchema) -> ResponseSchema:
         response = query_database(user_query)
         
         # Check if we got a meaningful answer (not "I don't know" or empty)
+        no_answer_patterns = [
+            "i don't know",
+            "i do not know", 
+            "i cannot find",
+            "no data",
+            "no results",
+            "no information",
+            "not found",
+            "unable to",
+            "cannot answer",
+            "no relevant",
+            "empty result",
+            "there is no",
+            "there are no",
+        ]
         response_lower = response.lower()
-        has_answer = bool(response) and "i don't know" not in response_lower and "no information" not in response_lower
+        has_no_answer = any(pattern in response_lower for pattern in no_answer_patterns)
+        has_answer = bool(response) and not has_no_answer
         
         return {
             "user_query": user_query,

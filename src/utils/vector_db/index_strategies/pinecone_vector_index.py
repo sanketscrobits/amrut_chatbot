@@ -77,12 +77,23 @@ class PineconeVectorIndex(VectorIndexStrategy):
         try:
             response = index.query(**query_params)
             
+            # Debug: Print raw Pinecone response
+            print(f"DEBUG Pinecone Query - Namespace: {namespace}")
+            print(f"DEBUG Pinecone Response - Matches count: {len(response.get('matches', []))}")
+            if response.get("matches"):
+                for i, m in enumerate(response["matches"][:5]):
+                    print(f"DEBUG Match {i}: score={m.get('score', 'N/A')}, text_preview={m.get('metadata', {}).get('chunk_text', '')[:100]}...")
+            
             if response.get("matches"):
                 # Filter by score manually if needed since threshold param availability depends on client/setup
-                matches = [m for m in response["matches"] if m.get('score', 0) >= 0.7]
+                # Lowered from 0.7 to 0.3 to allow more matches - adjust based on quality requirements
+                score_threshold = 0.7
+                matches = [m for m in response["matches"] if m.get('score', 0) >= score_threshold]
+                print(f"DEBUG: Score threshold={score_threshold}, Matches after filter: {len(matches)}")
                 if matches:
-                    # Combine contexts potentially? Or just return top 1
-                    context = matches[0]["metadata"].get("chunk_text", "")
+                    # Combine top N chunks for better context (max 5)
+                    top_chunks = [m["metadata"].get("chunk_text", "") for m in matches[:5] if m["metadata"].get("chunk_text")]
+                    context = "\n\n---\n\n".join(top_chunks)
                     return context or "No relevant context found for the question."
                 return "No relevant context found for the question (low score)."
             else:
