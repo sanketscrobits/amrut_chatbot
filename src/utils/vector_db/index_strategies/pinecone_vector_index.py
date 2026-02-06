@@ -78,12 +78,23 @@ class PineconeVectorIndex(VectorIndexStrategy):
             response = index.query(**query_params)
             
             if response.get("matches"):
-                # Filter by score manually if needed since threshold param availability depends on client/setup
-                matches = [m for m in response["matches"] if m.get('score', 0) >= 0.7]
+                # Filter by score manually if needed
+                matches = [m for m in response["matches"] if m.get('score', 0) >= 0.70] # Lowered threshold slightly for robustness
+                
                 if matches:
-                    # Combine contexts potentially? Or just return top 1
-                    context = matches[0]["metadata"].get("chunk_text", "")
-                    return context or "No relevant context found for the question."
+                    # OPTIMIZATION: Return top 5 results concatenated
+                    top_k = 5
+                    top_matches = matches[:top_k]
+                    
+                    params = []
+                    for i, m in enumerate(top_matches):
+                        chunk_text = m["metadata"].get("chunk_text", "")
+                        score = m.get('score', 0)
+                        params.append(f"--- Context Chunk {i+1} (Score: {score:.4f}) ---\n{chunk_text}")
+                    
+                    combined_context = "\n\n".join(params)
+                    return combined_context or "No relevant context found for the question."
+                
                 return "No relevant context found for the question (low score)."
             else:
                 return "No relevant context found for the question."

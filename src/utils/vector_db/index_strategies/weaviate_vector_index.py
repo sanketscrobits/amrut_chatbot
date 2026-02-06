@@ -239,6 +239,7 @@ class WeaviateVectorIndex(VectorIndexStrategy):
         
         # Sort by combined score
         ranked = sorted(scores.items(), key=lambda x: x[1], reverse=True)
+        # Returns list of (chunk_text, score) tuples
         return ranked
     
     def semantic_search(self, embeded_query: list[float], namespace: str = None, query_text: str = None) -> str:
@@ -299,20 +300,41 @@ class WeaviateVectorIndex(VectorIndexStrategy):
                 print(f"Combined results: {len(ranked)} unique chunks")
                 
                 if ranked:
-                    # Return top result
-                    best_chunk = ranked[0][0]
+                    # OPTIMIZATION: Return top 5 results concatenated to solve "Keyhole Problem"
+                    top_k = 5
+                    top_results = ranked[:top_k]
+                    
+                    params = []
+                    for i, (chunk_text, score) in enumerate(top_results):
+                        params.append(f"--- Context Chunk {i+1} (Score: {score:.4f}) ---\n{chunk_text}")
+                    
+                    combined_context = "\n\n".join(params)
+                    
                     print(f"Best hybrid score: {ranked[0][1]:.4f}")
+                    print(f"Returning {len(top_results)} chunks (approx {len(combined_context)} chars)")
                     print(f"=== END HYBRID SEARCH ===\n")
-                    return best_chunk
+                    return combined_context
             else:
                 # Fallback to vector-only
                 print("Keyword search unavailable, using vector-only")
                 if vector_matches:
                     vector_matches.sort(key=lambda x: x[1], reverse=True)
-                    context = vector_matches[0][0].properties.get("chunk_text", "")
+                    
+                    # OPTIMIZATION: Return top 5 results concatenated
+                    top_k = 5
+                    top_results = vector_matches[:top_k]
+                    
+                    params = []
+                    for i, (obj, score) in enumerate(top_results):
+                        chunk_text = obj.properties.get("chunk_text", "")
+                        params.append(f"--- Context Chunk {i+1} (Score: {score:.4f}) ---\n{chunk_text}")
+                    
+                    combined_context = "\n\n".join(params)
+
                     print(f"Best vector score: {vector_matches[0][1]:.4f}")
+                    print(f"Returning {len(top_results)} chunks (approx {len(combined_context)} chars)")
                     print(f"=== END HYBRID SEARCH ===\n")
-                    return context or "No relevant context found for the question."
+                    return combined_context or "No relevant context found for the question."
             
             print(f"No matches found")
             print(f"=== END HYBRID SEARCH ===\n")

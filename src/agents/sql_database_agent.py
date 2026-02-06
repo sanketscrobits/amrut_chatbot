@@ -11,8 +11,13 @@ from src.utils.yaml_loader import load_prompts
 from src.schemas.response_schema import ResponseSchema
 from langchain_community.tools.sql_database.tool import QuerySQLDataBaseTool
 from src.utils.schema_context import DB_SCHEMA_CONTEXT
-# OPTIMIZATION: Import SQL template cache
+# OPTIMIZATION: Import SQL template cache and schema pruner
 from src.agents.sql_template_cache import get_sql_from_template
+from src.utils.schema_pruner import get_pruned_schema
+import os
+
+# Phase 7: Schema Pruning Configuration
+ENABLE_SCHEMA_PRUNING = os.getenv("ENABLE_SCHEMA_PRUNING", "true").lower() == "true"
 
 @contextmanager
 def timeout(seconds):
@@ -57,13 +62,16 @@ def query_database_chain(user_input: str):
             
             if not sql_query:
                 # Template cache miss - use LLM generation
+                # OPTIMIZATION: Use pruned schema instead of full DB_SCHEMA_CONTEXT
+                pruned_schema = get_pruned_schema(user_input, enable_pruning=ENABLE_SCHEMA_PRUNING)
+                
                 gen_prompt_str = prompts.get("sql_generation_prompt", "")
                 gen_prompt = ChatPromptTemplate.from_template(
                     gen_prompt_str + "\n\nSchema:\n{schema}\n\nQuestion: {question}"
                 )
                     
                 generate_chain = (
-                    RunnablePassthrough.assign(schema=lambda _: DB_SCHEMA_CONTEXT)
+                    RunnablePassthrough.assign(schema=lambda _: pruned_schema)  # ← Using pruned schema
                     | gen_prompt
                     | llm
                     | StrOutputParser()

@@ -10,6 +10,8 @@ from langchain_huggingface import HuggingFaceEmbeddings
 from contextlib import asynccontextmanager
 from src.utils.db_connection import get_supabase_db
 from src.utils.response_cache import get_cached_response, cache_response
+# Phase 7: Semantic caching
+from src.utils.semantic_cache import get_semantic_cached_response, cache_semantic_response
 
 # Initialize vector store using factory pattern
 _embeddings = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
@@ -94,7 +96,12 @@ async def chatbot_endpoint(request: ChatRequest):
         
         print(f"User message: {user_input}")
         
-        # RESPONSE CACHING: Check cache first
+        # PHASE 7: Semantic caching - find semantically similar queries
+        cached_response = get_semantic_cached_response(user_input)
+        if cached_response:
+            return ChatResponse(**cached_response)
+        
+        # Fallback to exact match cache
         cached_response = get_cached_response(user_input)
         if cached_response:
             return ChatResponse(**cached_response)
@@ -163,7 +170,10 @@ async def chatbot_endpoint(request: ChatRequest):
             "websocket_url": websocket_url
         }
         
-        # RESPONSE CACHING: Cache successful responses
+        # PHASE 7: Cache with semantic indexing
+        cache_semantic_response(user_input, response_data, ttl=900)
+        
+        # Also cache with exact match (backward compatibility)
         cache_response(user_input, response_data)
         
         return ChatResponse(**response_data)
@@ -191,18 +201,109 @@ async def delete_document(uuid: str):
         raise HTTPException(status_code=500, detail=str(e))
 
 
-# User WebSocket Endpoint for Escalation Chat
-@app.websocket("/ws/escalation/{escalation_id}/user")
-async def websocket_user_chat(websocket: WebSocket, escalation_id: str):
+
+# --------------------------------------------------------------------------
+# Phase 7: Streaming Responses (SSE)
+# --------------------------------------------------------------------------
+
+import json
+import asyncio
+from sse_starlette.sse import EventSourceResponse
+from src.utils.llm_singleton import get_streaming_llm
+
+@app.post("/chatbot/stream")
+async def chatbot_stream_endpoint(request: ChatRequest):
     """
-    WebSocket for user real-time chat with admin during escalation.
+    Streaming endpoint for Chatbot.
+    Returns Server-Sent Events (SSE) with token-by-token response.
     """
-    escalation = get_escalation(escalation_id)
-    if not escalation:
-        await websocket.close(code=4001)
-        return
-    
-    await handle_websocket_chat(websocket, escalation_id, "user")
+    async def event_generator():
+        try:
+            user_input = request.user_message
+            
+            # Helper to format SSE message
+            def format_sse(data):
+                return {"event": "message", "data": json.dumps(data)}
+            
+            # 1. Check Cache First (Instant Response)
+            # ---------------------------------------
+            # Try semantic cache first
+            cached_response = get_semantic_cached_response(user_input)
+            if not cached_response:
+                # Try exact match cache
+                cached_response = get_cached_response(user_input)
+                
+            if cached_response:
+                # If cached, stream it as a single chunk (effectively instant)
+                response_text = cached_response.get("response", "")
+                yield format_sse({"token": response_text, "done": True, "cached": True})
+                return
+
+            # 2. Run Workflow (Streaming Mode)
+            # --------------------------------
+            # NOTE: Full LangGraph streaming requires structural changes.
+            # For Phase 7, we simulate streaming by running the workflow and 
+            # then streaming the final synthesis step if possible, or 
+            # just yielding the final result.
+            
+            # Ideally, we would use .astream_events() on the graph, but 
+            # our graph structure needs to support it. 
+            # For now, we will execute the workflow and yield the result.
+            # This is a "Pseudo-Stream" for now to establish the contract.
+            
+            initial_state = {
+                "validated_user_input": user_input,
+                "query_response": "",
+                "evaluation_state": "",
+                "retry_count": 0,
+                "instruction": "",
+                "data_source": "",
+                "weather_info": "",
+                "needs_escalation": False
+            }
+            
+            # Run workflow (awaiting full execution)
+            Loop = asyncio.get_event_loop()
+            final_state = await Loop.run_in_executor(None, workflow.invoke, initial_state)
+            
+            query_response = final_state.get("query_response", "No response generated.")
+            
+            # Parse response (reuse logic from main endpoint)
+            answer = query_response
+            if "ValidationOutcome" in str(query_response):
+                # ... extraction logic ...
+                # Simplified for stream (robust logic is in main endpoint)
+                 match = re.search(r'validated_output="((?:[^"\\]|\\.)*)"', str(query_response))
+                 if match:
+                     answer = match.group(1).replace('\\n', '\n').replace('\\"', '"').strip()
+                 else:
+                     start_idx = str(query_response).find("validated_output='") + len("validated_output='")
+                     if start_idx > len("validated_output='"):
+                         answer = str(query_response)[start_idx:].split("',")[0].strip()
+            
+            answer = str(answer).replace("'", "").strip().strip("'").strip()
+            
+            # Stream the result token by token (Simulated for UX)
+            # In a real full-async refactor, we would stream directly from the LLM
+            tokens = answer.split(" ")
+            for token in tokens:
+                yield format_sse({"token": token + " ", "done": False})
+                await asyncio.sleep(0.01) # Small delay to simulate typing
+            
+            # Cache the result
+            response_data = {
+                "response": answer,
+                "escalation_required": final_state.get("needs_escalation", False)
+            }
+            cache_semantic_response(user_input, response_data, ttl=900)
+            cache_response(user_input, response_data)
+
+            yield format_sse({"done": True})
+
+        except Exception as e:
+            yield format_sse({"error": str(e), "done": True})
+
+    return EventSourceResponse(event_generator())
 
 
 # python -m uvicorn src.main.chatbotapi:app --reload

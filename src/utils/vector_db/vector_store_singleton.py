@@ -21,8 +21,8 @@ class VectorStoreSingleton():
             
             # Use fixed-size chunking with overlap for better retrieval consistency
             self.text_splitter = RecursiveCharacterTextSplitter(
-                chunk_size=512,  # Fixed size for consistency
-                chunk_overlap=50,  # Overlap to preserve context at boundaries
+                chunk_size=1000,  # Increased from 512 for better context
+                chunk_overlap=200,  # Increased overlap to prevent boundary loss
                 length_function=len,
                 separators=["\n\n", "\n", ". ", "! ", "? ", ", ", " ", ""]
             )
