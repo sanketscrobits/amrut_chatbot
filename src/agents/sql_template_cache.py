@@ -96,15 +96,114 @@ SQL_TEMPLATES = {
     
     # NEW: Business queries
     "count_all_businesses": """
-        SELECT COUNT(*) FROM businesses;
+        SELECT COUNT(*) FROM local_businesses;
     """,
     
     "list_all_businesses": """
-        SELECT name_en, category, contact_number, address
-        FROM businesses
+        SELECT name_en, description_en, address
+        FROM local_businesses
         LIMIT {limit};
     """,
+
+    # NEW: Detailed Templates for CSV Analysis
+    "get_district_population": """
+        SELECT name_en, population
+        FROM districts
+        WHERE name_en ILIKE '%{district}%'
+        LIMIT 1;
+    """,
+    "get_best_time_visit_district": """
+        SELECT name_en, best_time_to_visit_en
+        FROM districts
+        WHERE name_en ILIKE '%{district}%'
+        LIMIT 1;
+    """,
+    "get_place_entry_fee": """
+        SELECT name_en, entry_fee
+        FROM tourist_places
+        WHERE name_en ILIKE '%{place}%'
+        LIMIT 1;
+    """,
+    "get_place_hours": """
+        SELECT name_en, opening_hours_en
+        FROM tourist_places
+        WHERE name_en ILIKE '%{place}%'
+        LIMIT 1;
+    """,
+    "get_place_description": """
+        SELECT name_en, description_en
+        FROM tourist_places
+        WHERE name_en ILIKE '%{place}%'
+        LIMIT 1;
+    """,
+    "list_services_in_district": """
+        SELECT es.name, es.phone, es.address, es.available_24_7
+        FROM emergency_services es
+        JOIN districts d ON es.district_id = d.id
+        WHERE d.name_en ILIKE '%{district}%' AND es.service_type ILIKE '%{service_type}%'
+        LIMIT 10;
+    """,
+    "get_service_contact": """
+        SELECT name, phone, address
+        FROM emergency_services
+        WHERE name ILIKE '%{name}%'
+        LIMIT 1;
+    """,
+    "list_businesses_in_district": """
+        SELECT b.name_en, b.description_en, b.address, b.phone
+        FROM local_businesses b
+        JOIN districts d ON b.district_id = d.id
+        WHERE d.name_en ILIKE '%{district}%'
+             AND (b.name_en ILIKE '%{category}%' OR b.description_en ILIKE '%{category}%')
+        LIMIT 10;
+    """,
+    "get_business_contact": """
+        SELECT name_en, phone, email, address
+        FROM local_businesses
+        WHERE name_en ILIKE '%{name}%'
+        LIMIT 1;
+    """,
 }
+
+# Helper to assist with singularization
+def singularize(word):
+    """
+    Very basic singularization for our specific domain keywords.
+    """
+    word = word.strip("?.! ").lower() # Strip punctuation and lowercase
+    
+    # Custom mappings based on DB inspection
+    mappings = {
+        "hospitals": "Hospital",
+        "hospital": "Hospital",
+        "pharmacies": "Pharmacy",
+        "pharmacy": "Pharmacy",
+        "police stations": "Police",  # DB has 'Police'
+        "police station": "Police",
+        "police": "Police",
+        "public toilets": "Public Toilet",
+        "public toilet": "Public Toilet",
+        "hotels": "Hotel",
+        "hotel": "Hotel",
+        "restaurants": "Restaurant",
+        "restaurant": "Restaurant",
+        "taxis": "Taxi",
+        "taxi": "Taxi"
+    }
+    
+    if word in mappings:
+        return mappings[word]
+        
+    # Default stripping 's' if not found (basic fallback)
+    if word.endswith('s') and word[:-1] in mappings.values(): # e.g. Forts -> Fort (if we had Fort)
+         pass # Logic here is tricky without full dictionary. 
+    
+    # For now, just return title case if not in mapping, or strip 's' if it looks like a simple plural
+    if word.endswith('s'):
+        return word[:-1].title()
+        
+    return word.title()
+
 
 # EXPANDED: Pattern matchers (6 → 20+ patterns)
 QUERY_PATTERNS = [
@@ -117,12 +216,12 @@ QUERY_PATTERNS = [
     {
         "pattern": r"tourist place.+(?:in|near|at|located).+?(\w+)",
         "template": "places_in_district",
-        "extractor": lambda m: {"district": m.group(1), "limit": 10}
+        "extractor": lambda m: {"district": m.group(1).strip("?.! "), "limit": 10}
     },
     {
         "pattern": r"(?:in|near|at|located).+?(\w+).+tourist place",
         "template": "places_in_district",
-        "extractor": lambda m: {"district": m.group(1), "limit": 10}
+        "extractor": lambda m: {"district": m.group(1).strip("?.! "), "limit": 10}
     },
     {
         "pattern": r"(?:how many|count|total|number).+(?:tourist place|attraction|monument|place|site)",
@@ -149,15 +248,20 @@ QUERY_PATTERNS = [
     {
         "pattern": r"(?:show|find|get).+district.+(?:named?|called)\s+(\w+)",
         "template": "district_by_name",
-        "extractor": lambda m: {"district": m.group(1)}
+        "extractor": lambda m: {"district": m.group(1).strip("?.! ")}
     },
     {
         "pattern": r"(?:info|information|details?).+district.+(\w+)",
         "template": "district_by_name",
-        "extractor": lambda m: {"district": m.group(1)}
+        "extractor": lambda m: {"district": m.group(1).strip("?.! ")}
     },
     
     # NEW: Filtered place patterns
+    {
+        "pattern": r"(?:show|list|find).*(?:forts?|monuments?|temples?|museums?|places?).+(?:in|at|of|near)\s+(\w+)",
+        "template": "places_in_district",
+        "extractor": lambda m: {"district": m.group(1).strip("?.! "), "limit": 10}
+    },
     {
         "pattern": r"places?.+(?:with|having|contains?).+(?:description|detail|info)",
         "template": "places_with_description",
@@ -173,12 +277,76 @@ QUERY_PATTERNS = [
     {
         "pattern": r"how many.+places?.+(?:in|at|near)\s+(\w+)",
         "template": "count_places_in_district",
-        "extractor": lambda m: {"district": m.group(1)}
+        "extractor": lambda m: {"district": m.group(1).strip("?.! ")}
     },
     {
         "pattern": r"count.+places?.+(?:in|at)\s+(\w+)",
         "template": "count_places_in_district",
-        "extractor": lambda m: {"district": m.group(1)}
+        "extractor": lambda m: {"district": m.group(1).strip("?.! ")}
+    },
+
+    # NEW: Detailed Templates for CSV Analysis (Population, Best Time, Etc)
+    {
+        "pattern": r"(?:what is the\s+)?population of (.+)",
+        "template": "get_district_population",
+        "extractor": lambda m: {"district": m.group(1).strip("?.! ")}
+    },
+    {
+        "pattern": r"(?:tell me about|info on|details of)\s+(.+) district",
+        "template": "get_district_description",
+        "extractor": lambda m: {"district": m.group(1).strip("?.! ")}
+    },
+    {
+        "pattern": r"best time to visit (.+)",
+        "template": "get_best_time_visit_district",
+        "extractor": lambda m: {"district": m.group(1).strip("?.! ")}
+    },
+    
+    # Places details
+    {
+        "pattern": r"entry fee (?:for|of) (.+)",
+        "template": "get_place_entry_fee",
+        "extractor": lambda m: {"place": m.group(1).strip("?.! ")}
+    },
+    {
+        "pattern": r"opening hours (?:of|for) (.+)",
+        "template": "get_place_hours", 
+        "extractor": lambda m: {"place": m.group(1).strip("?.! ")}
+    },
+    {
+        "pattern": r"tell me about (.+) (?:fort|temple|museum|place)",
+        "template": "get_place_description",
+        "extractor": lambda m: {"place": m.group(1).strip("?.! ")}
+    },
+    
+    # Emergency
+    {
+        "pattern": r"(hospitals?|pharmacies|police stations?|police).*(?:in|at|near)\s+(.+)",
+        "template": "list_services_in_district",
+        "extractor": lambda m: {"service_type": singularize(m.group(1)), "district": m.group(2).strip("?.! ")}
+    },
+    {
+        "pattern": r"emergency.*(?:contact|number|phone|helpline).*(?:for|of)\s+(.+)",
+        "template": "get_service_contact",
+        "extractor": lambda m: {"name": m.group(1).strip("?.! ")}
+    },
+    
+    # Businesses
+    {
+        "pattern": r"(hotels?|restaurants?|taxis?|lodges?).*(?:in|at|near)\s+(.+)",
+        "template": "list_businesses_in_district",
+        "extractor": lambda m: {"category": singularize(m.group(1)), "district": m.group(2).strip("?.! ")}
+    },
+     {
+        "pattern": r"(?:contact|phone).*(?:number|details).*(?:for|of)\s+(.+)",
+        "template": "get_business_contact",
+        "extractor": lambda m: {"name": m.group(1).strip("?.! ")}
+    },
+    # CRITICAL FIX: Explicit pattern for "Show me all tourist places"
+    {
+        "pattern": r"(?:show|list|give|find|tell).+(?:me|us)?.+(?:all|every).+tourist places?",
+        "template": "list_all_places",
+        "params": {"limit": 20}
     },
     
     # NEW: Analytics patterns
@@ -212,12 +380,6 @@ QUERY_PATTERNS = [
         "pattern": r"(?:show|list|give|find).+(?:all|every).+business",
         "template": "list_all_businesses",
         "params": {"limit": 10}
-    },
-    # CRITICAL FIX: Explicit pattern for "Show me all tourist places"
-    {
-        "pattern": r"(?:show|list|give|find|tell).+(?:me|us)?.+(?:all|every).+tourist places?",
-        "template": "list_all_places",
-        "params": {"limit": 20}
     },
 ]
 
@@ -253,4 +415,3 @@ def get_sql_from_template(query: str) -> Optional[str]:
     
     print(f"❌ SQL Template Cache MISS: Falling back to LLM generation")
     return None
-

@@ -1,15 +1,16 @@
 """
 Async Database Connection Module
-
 Provides non-blocking database operations for better concurrency and performance.
 """
 
 from typing import Optional
+import os
+import time
+import re
 from langchain_community.utilities import SQLDatabase
 from sqlalchemy import create_engine
 from sqlalchemy.pool import QueuePool
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncEngine
-import os
 
 class AsyncSupabaseDB:
     """Async connection pooled Supabase database for non-blocking operations."""
@@ -38,7 +39,6 @@ class AsyncSupabaseDB:
             
             # Remove unsupported 'supa' parameter
             if "supa=" in connection_uri:
-                import re
                 connection_uri = re.sub(r'[?&]supa=[^&]+', '', connection_uri)
                 if "?" not in connection_uri and "&" in connection_uri:
                     connection_uri = connection_uri.replace("&", "?", 1)
@@ -51,7 +51,6 @@ class AsyncSupabaseDB:
             
             try:
                 print(f"[ASYNC_DB] Initializing async connection pool")
-                import time
                 t0 = time.time()
                 
                 # Create async SQLAlchemy engine
@@ -84,7 +83,6 @@ class AsyncSupabaseDB:
             
             connection_uri = SUPABASE_DATABASE_URI.replace("postgres://", "postgresql://")
             if "supa=" in connection_uri:
-                import re
                 connection_uri = re.sub(r'[?&]supa=[^&]+', '', connection_uri)
                 if "?" not in connection_uri and "&" in connection_uri:
                     connection_uri = connection_uri.replace("&", "?", 1)
@@ -96,7 +94,6 @@ class AsyncSupabaseDB:
             
             try:
                 print(f"[DB_POOL] Initializing connection pool (size={pool_size}, max_overflow={max_overflow})")
-                import time
                 t0 = time.time()
                 
                 self._engine = create_engine(

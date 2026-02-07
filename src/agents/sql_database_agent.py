@@ -1,6 +1,7 @@
 import os
 import time
 import signal
+import traceback
 from contextlib import contextmanager
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.output_parsers import StrOutputParser
@@ -14,8 +15,6 @@ from src.utils.schema_context import DB_SCHEMA_CONTEXT
 # OPTIMIZATION: Import SQL template cache and schema pruner
 from src.agents.sql_template_cache import get_sql_from_template
 from src.utils.schema_pruner import get_pruned_schema
-import os
-
 # OPTIMIZATION: SQL Result Caching
 from src.agents.sql_result_cache import get_cached_sql_result, cache_sql_result
 
@@ -59,6 +58,7 @@ def query_database_chain(user_input: str):
             
             # 2. Generate SQL
             t1 = time.time()
+            pruned_schema = ""
             
             # OPTIMIZATION: Try template cache first
             sql_query = get_sql_from_template(user_input)
@@ -139,7 +139,6 @@ def query_database_chain(user_input: str):
         return ""  # Return empty to trigger fallback to retriever
     except Exception as e:
         print(f"[SQL_AGENT] ❌ ERROR: {type(e).__name__}: {e}")
-        import traceback
         print(f"[SQL_AGENT] Traceback: {traceback.format_exc()}")
         return ""
 

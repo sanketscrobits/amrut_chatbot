@@ -7,6 +7,7 @@ from src.schemas.response_schema import ResponseSchema
 from src.utils.llm_singleton import get_llm
 from src.utils.yaml_loader import load_prompts
 from settings import DEBUG_MODE
+from src.agents.sql_template_cache import get_sql_from_template
 
 # REDIS INTEGRATION
 from src.utils.redis_client import get_cache, set_cache
@@ -111,6 +112,16 @@ def router_agent_node(state: ResponseSchema) -> ResponseSchema:
         cached_route = get_cached_route(user_input)
         if cached_route:
             return {"data_source": cached_route}
+        
+        # OPTIMIZATION: Check if query matches a known SQL template
+        # If it does, we can skip the LLM router significantly reducing latency and ensuring accuracy
+        template_sql = get_sql_from_template(user_input)
+        if template_sql:
+            if DEBUG_MODE:
+                 print(f"Router Optimization: SQL Template matched. Forcing SQL_DB route.")
+            # Cache for future
+            cache_route(user_input, "sql")
+            return {"data_source": "sql"}
         
         # Cache miss: run LLM classification
         chain = get_router_chain()

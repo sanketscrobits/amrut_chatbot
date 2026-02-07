@@ -2,44 +2,66 @@ from fastapi import FastAPI, HTTPException, WebSocket
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field, field_validator
 from typing import Optional
-from src.Workflow.master_workflow import workflow
 import re
+import json
+import asyncio
+import time
+from contextlib import asynccontextmanager
+from sse_starlette.sse import EventSourceResponse
+
+from src.Workflow.master_workflow import workflow
 from settings import NAMESPACE
 from src.utils.vector_db.vector_store_factory import create_vector_store
 from langchain_huggingface import HuggingFaceEmbeddings
-from contextlib import asynccontextmanager
 from src.utils.db_connection import get_supabase_db
 from src.utils.response_cache import get_cached_response, cache_response
-# Phase 7: Semantic caching
 from src.utils.semantic_cache import get_semantic_cached_response, cache_semantic_response
-
-# Initialize vector store using factory pattern
-_embeddings = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
-vector_store = create_vector_store(embeddings=_embeddings)
-from src.utils.escalation_manager import (create_escalation,get_escalation,handle_websocket_chat,close_escalation_connections)
-# Import routers
+from src.utils.escalation_manager import (
+    create_escalation, 
+    get_escalation, 
+    handle_websocket_chat, 
+    close_escalation_connections
+)
 from src.routers.admin_router import admin_router
 from src.routers.upload_router import upload_router
+from src.utils.llm_singleton import get_streaming_llm
+
+# Initialize vector store using factory pattern
+vector_store = None
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    global vector_store
+    
+    # Initialize Vector Store (Lazy Load to prevent import blocking)
+    try:
+        print("[STARTUP] 🧠 Initializing Vector Store...")
+        _embeddings = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
+        vector_store = create_vector_store(embeddings=_embeddings)
+        print("[STARTUP] ✅ Vector Store initialized.")
+    except Exception as e:
+        print(f"[STARTUP] ⚠️ Vector Store init failed: {e}")
+
     # Eagerly initialize DB connection pool to avoid cold start latency on first request
     # OPTIMIZATION: Pre-warm pool on startup for instant first query
     try:
-        print("[STARTUP] 🔥 Pre-warming database connection pool...")
-        import time
-        import asyncio
-        t0 = time.time()
+        print("[STARTUP] 🔥 Pre-warming database connection pool (Background Task)...")
         
-        # Run in thread pool to not block other startup tasks
-        loop = asyncio.get_event_loop()
-        await loop.run_in_executor(None, get_supabase_db)
+        async def warm_up_db():
+            try:
+                t0 = time.time()
+                loop = asyncio.get_running_loop()
+                await loop.run_in_executor(None, get_supabase_db)
+                t1 = time.time()
+                print(f"[STARTUP] ✅ Database pool ready in {t1-t0:.2f}s")
+            except Exception as e:
+                print(f"[STARTUP] ⚠️  Failed to pre-warm DB pool: {e}")
+
+        # Fire and forget (don't await)
+        asyncio.create_task(warm_up_db())
         
-        t1 = time.time()
-        print(f"[STARTUP] ✅ Database pool ready in {t1-t0:.2f}s (first query will be instant!)")
     except Exception as e:
-        print(f"[STARTUP] ⚠️  Failed to pre-warm DB pool: {e}")
-        print(f"[STARTUP] → First query will initialize pool (may be slower)")
+        print(f"[STARTUP] ⚠️  Failed to start DB pre-warm task: {e}")
     yield
     # Cleanup if needed
 
@@ -228,11 +250,6 @@ async def websocket_user_chat(websocket: WebSocket, escalation_id: str):
 # --------------------------------------------------------------------------
 # Phase 7: Streaming Responses (SSE)
 # --------------------------------------------------------------------------
-
-import json
-import asyncio
-from sse_starlette.sse import EventSourceResponse
-from src.utils.llm_singleton import get_streaming_llm
 
 @app.post("/chatbot/stream")
 async def chatbot_stream_endpoint(request: ChatRequest):

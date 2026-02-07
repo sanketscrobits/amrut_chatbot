@@ -1,8 +1,10 @@
 from typing import Optional
+import os
+import time
+import re
 from langchain_community.utilities import SQLDatabase
 from sqlalchemy import create_engine
 from sqlalchemy.pool import QueuePool
-import os
 
 class SupabaseDBPooled:
     """Connection pooled Supabase database for better performance."""
@@ -27,7 +29,6 @@ class SupabaseDBPooled:
             # Fix deprecated schema and remove unsupported 'supa' parameter
             connection_uri = SUPABASE_DATABASE_URI.replace("postgres://", "postgresql://")
             if "supa=" in connection_uri:
-                import re
                 connection_uri = re.sub(r'[?&]supa=[^&]+', '', connection_uri)
                 # If we removed the initial ?, make sure the first param starts with ? if any exist
                 if "?" not in connection_uri and "&" in connection_uri:
@@ -42,7 +43,6 @@ class SupabaseDBPooled:
             
             try:
                 print(f"[DB_POOL] Initializing connection pool (size={pool_size}, max_overflow={max_overflow}, pre_ping={pool_pre_ping})")
-                import time
                 t0 = time.time()
                 
                 # Create SQLAlchemy engine with connection pooling

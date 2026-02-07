@@ -148,8 +148,9 @@ sql_synthesis_prompt: |
   Given the User Question and Database Result (SQL query output), 
   synthesize a clear answer.
   
-  If result is empty or irrelevant, return "I don't know".
-  Otherwise, provide a concise natural language answer.ural language response.
+  If the result contains data relevant to the question, use it to answer directly.
+  If the result is truly empty or completely unrelated, only then return "I don't know".
+  
   USER QUESTION: {question}
   DATABASE RESULT: {result}
   
