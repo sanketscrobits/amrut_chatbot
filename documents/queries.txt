@@ -1,0 +1,169 @@
+
+1️⃣ Basic Retrieval (Sanity Checks)
+
+
+Use these first to ensure the agent can fetch data correctly.
+
+
+Tourist Places
+
+
+“Show me all tourist places.”
+“List the names of all tourist places available.”
+“Give me the details of the first 5 tourist places.”
+ 
+
+ 
+
+ 
+
+Local Businesses
+ 
+
+ 
+
+“What local businesses are stored in the database?”
+“List all businesses with their category and location.”
+ 
+
+ 
+
+ 
+
+Emergency Services
+ 
+
+ 
+
+“Show all emergency services.”
+“What emergency services are available in this area?”
+ 
+
+ 
+
+ 
+
+Categories
+ 
+
+ 
+
+“List all categories.”
+“What are the different business categories available?”
+ 
+
+ 
+
+ 
+
+ 
+
+2️⃣ Filtering & Conditions
+ 
+
+ 
+
+Tests WHERE clauses and field understanding.
+
+ 
+
+ 
+
+Tourist Places
+ 
+
+ 
+
+“Show tourist places located in Mumbai.”
+“Which tourist places are rated above 4.5?”
+“Find tourist places that are open on weekends.”
+“Show tourist places with an entry fee less than ₹100.”
+ 
+
+ 
+
+ 
+
+Local Businesses
+ 
+
+ 
+
+“List restaurants only.”
+“Show businesses that are currently open.”
+“Find businesses located in Bangalore.”
+“Which businesses have ratings below 3?”
+
+Emergency Services
+
+“Show hospitals only.”
+“List emergency services available 24/7.”
+“Find the nearest police stations.”
+ 
+3️⃣ Category-Based Queries (Joins)
+Tests foreign keys and joins between tables.
+
+“Show all businesses under the Food & Dining category.”
+“List tourist places grouped by category.”
+“Which categories have the most businesses?”
+“Show all tourist places that belong to the Historical category.”
+ 
+4️⃣ Search & Fuzzy Matching
+Tests partial matching and text search.
+
+“Find tourist places related to beach.”
+“Show cafes near MG Road.”
+“Search for businesses with the word ‘hotel’ in their name.”
+“Find emergency services related to ‘medical’.”
+ 
+5️⃣ Aggregation & Analytics
+
+Tests COUNT, AVG, MAX, MIN.
+
+“How many tourist places are there in total?”
+“How many businesses are there per category?”
+“What is the average rating of tourist places?”
+“Which category has the highest number of businesses?”
+“How many emergency services are listed city-wise?”
+ 
+6️⃣ Comparison & Ranking
+Tests ORDER BY, LIMIT.
+
+“Show the top 5 highest-rated tourist places.”
+“Which are the lowest-rated businesses?”
+“List the most popular tourist places.”
+“Show businesses sorted by rating, highest first.”
+ 
+
+
+7️⃣ Location & Proximity (if lat/long exists)
+Tests geo-awareness.
+
+“Find tourist places near Connaught Place.”
+“Show nearby hospitals within 5 km.”
+“Which businesses are closest to the city center?”
+ 
+8️⃣ Time-Based / Availability Queries (if supported)
+
+“Which businesses are open right now?”
+“Show emergency services available at night.”
+“Which tourist places are open today?”
+ 
+9️⃣ Edge & Robustness Tests (Very Important)
+These check how smart and safe your agent is.
+
+“Show tourist places with missing ratings.”
+“Are there any businesses without categories?”
+“Return nothing if no data matches.”
+“Show me a tourist place that doesn’t exist.”
+“What happens if I search for ‘asdfgh’?”
+
+
+🔟 Conversational / Follow-up Queries
+Tests memory and conversational context.
+
+“Show tourist places in Goa.”
+“Now only show the ones with rating above 4.”
+“Sort them by popularity.”
+“Give me the best one.”
+ 

@@ -320,8 +320,8 @@ class WeaviateVectorIndex(VectorIndexStrategy):
                 if vector_matches:
                     vector_matches.sort(key=lambda x: x[1], reverse=True)
                     
-                    # OPTIMIZATION: Return top 5 results concatenated
-                    top_k = 5
+                    # Return top 10 results after re-ranking (increased from 5 for better coverage)
+                    top_k = 10
                     top_results = vector_matches[:top_k]
                     
                     params = []

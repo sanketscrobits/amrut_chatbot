@@ -16,6 +16,9 @@ from src.agents.sql_template_cache import get_sql_from_template
 from src.utils.schema_pruner import get_pruned_schema
 import os
 
+# OPTIMIZATION: SQL Result Caching
+from src.agents.sql_result_cache import get_cached_sql_result, cache_sql_result
+
 # Phase 7: Schema Pruning Configuration
 ENABLE_SCHEMA_PRUNING = os.getenv("ENABLE_SCHEMA_PRUNING", "true").lower() == "true"
 
@@ -47,8 +50,8 @@ def query_database_chain(user_input: str):
     """
     t0 = time.time()
     try:
-        # Wrap entire chain in 5-second timeout
-        with timeout(5):
+        # Wrap entire chain in 10-second timeout (increased for complex queries)
+        with timeout(10):
             # 1. Setup
             llm = get_llm(model="gemini-2.5-flash", temperature=0)
             db = get_supabase_db()  # Singleton (fast if already warm)
@@ -81,10 +84,18 @@ def query_database_chain(user_input: str):
                 sql_query = sql_query.strip().replace("```sql", "").replace("```", "")
             
             t2 = time.time()
-            print(f"SQL Generated ({t2-t1:.2f}s): {sql_query}")
+            print(f"[SQL_AGENT] SQL Generated ({t2-t1:.2f}s): {sql_query}")
+            print(f"[SQL_AGENT] Pruned Schema Used: {pruned_schema[:200]}..." if ENABLE_SCHEMA_PRUNING else "[SQL_AGENT] Full schema used")
             
             if "I don't know" in sql_query or not sql_query:
                 return ""
+            
+            # OPTIMIZATION: Check SQL result cache before execution
+            cached_result = get_cached_sql_result(user_input, sql_query)
+            if cached_result:
+                t_cache = time.time()
+                print(f"[SQL_AGENT] Cache hit! Total time: {t_cache-t0:.2f}s")
+                return cached_result
 
             # 3. Execute SQL with 3-second timeout
             execute_tool = QuerySQLDataBaseTool(db=db)
@@ -98,7 +109,9 @@ def query_database_chain(user_input: str):
                 db_result = execute_tool.invoke(sql_query)
             
             t3 = time.time()
-            print(f"SQL Executed ({t3-t2:.2f}s): {str(db_result)[:100]}...")
+            print(f"[SQL_AGENT] SQL Executed ({t3-t2:.2f}s)")
+            print(f"[SQL_AGENT] Result Preview: {str(db_result)[:200]}...")
+            print(f"[SQL_AGENT] Result Length: {len(str(db_result))} chars")
             
             if not db_result:
                 return ""
@@ -112,15 +125,22 @@ def query_database_chain(user_input: str):
 
             t4 = time.time()
             
-            print(f"Synthesis ({t4-t3:.2f}s). Total Chain: {t4-t0:.2f}s")
+            print(f"[SQL_AGENT] Synthesis ({t4-t3:.2f}s). Total Chain: {t4-t0:.2f}s")
+            print(f"[SQL_AGENT] Final Response Preview: {response[:100]}...")
+            
+            # OPTIMIZATION: Cache the result for future queries
+            cache_sql_result(user_input, sql_query, response.strip())
+            
             return response.strip()
 
     except TimeoutError as e:
-        print(f"SQL Chain Timeout: {e}")
-        print("Falling back to retriever agent")
+        print(f"[SQL_AGENT] ❌ TIMEOUT after 10s: {e}")
+        print(f"[SQL_AGENT] Falling back to retriever agent")
         return ""  # Return empty to trigger fallback to retriever
     except Exception as e:
-        print(f"SQL Chain Error: {e}")
+        print(f"[SQL_AGENT] ❌ ERROR: {type(e).__name__}: {e}")
+        import traceback
+        print(f"[SQL_AGENT] Traceback: {traceback.format_exc()}")
         return ""
 
 def sql_agent_node(state: ResponseSchema) -> ResponseSchema:

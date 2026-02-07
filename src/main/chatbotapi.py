@@ -23,13 +23,23 @@ from src.routers.upload_router import upload_router
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Eagerly initialize DB connection to avoid cold start latency on first request
+    # Eagerly initialize DB connection pool to avoid cold start latency on first request
+    # OPTIMIZATION: Pre-warm pool on startup for instant first query
     try:
-        print("Startup: Eagerly warming up Supabase connection...")
-        get_supabase_db()
-        print("Startup: Supabase connection warm.")
+        print("[STARTUP] 🔥 Pre-warming database connection pool...")
+        import time
+        import asyncio
+        t0 = time.time()
+        
+        # Run in thread pool to not block other startup tasks
+        loop = asyncio.get_event_loop()
+        await loop.run_in_executor(None, get_supabase_db)
+        
+        t1 = time.time()
+        print(f"[STARTUP] ✅ Database pool ready in {t1-t0:.2f}s (first query will be instant!)")
     except Exception as e:
-        print(f"Startup Warning: Failed to warm up DB: {e}")
+        print(f"[STARTUP] ⚠️  Failed to pre-warm DB pool: {e}")
+        print(f"[STARTUP] → First query will initialize pool (may be slower)")
     yield
     # Cleanup if needed
 
@@ -199,6 +209,19 @@ async def delete_document(uuid: str):
         return {"status": "ok", "message": f"Deleted documents with source {uuid} from namespace {NAMESPACE}"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.websocket("/ws/escalation/{escalation_id}/user")
+async def websocket_user_chat(websocket: WebSocket, escalation_id: str):
+    """
+    WebSocket for user real-time chat with admin during escalation.
+    """
+    escalation = get_escalation(escalation_id)
+    if not escalation:
+        await websocket.close(code=4001)
+        return
+    
+    await handle_websocket_chat(websocket, escalation_id, "user")
 
 
 

@@ -93,13 +93,24 @@ SQL_TEMPLATES = {
         HAVING COUNT(tp.id) > 0
         ORDER BY place_count DESC;
     """,
+    
+    # NEW: Business queries
+    "count_all_businesses": """
+        SELECT COUNT(*) FROM businesses;
+    """,
+    
+    "list_all_businesses": """
+        SELECT name_en, category, contact_number, address
+        FROM businesses
+        LIMIT {limit};
+    """,
 }
 
 # EXPANDED: Pattern matchers (6 → 20+ patterns)
 QUERY_PATTERNS = [
     # Original patterns
     {
-        "pattern": r"(?:show|list|give|find).+(?:all|every).+tourist place",
+        "pattern": r"(?:show|list|give|find).+(?:all|every).+(?:tourist place|attraction|monument|heritage|site|sightseeing)",
         "template": "list_all_places",
         "params": {"limit": 10}
     },
@@ -114,7 +125,7 @@ QUERY_PATTERNS = [
         "extractor": lambda m: {"district": m.group(1), "limit": 10}
     },
     {
-        "pattern": r"how many.+tourist place",
+        "pattern": r"(?:how many|count|total|number).+(?:tourist place|attraction|monument|place|site)",
         "template": "count_all_places",
         "params": {}
     },
@@ -190,6 +201,23 @@ QUERY_PATTERNS = [
         "pattern": r"(?:show|list).+districts?.+tourist",
         "template": "districts_with_places",
         "params": {}
+    },
+    
+    {
+        "pattern": r"(?:how many|count|total).+business",
+        "template": "count_all_businesses",
+        "params": {}
+    },
+    {
+        "pattern": r"(?:show|list|give|find).+(?:all|every).+business",
+        "template": "list_all_businesses",
+        "params": {"limit": 10}
+    },
+    # CRITICAL FIX: Explicit pattern for "Show me all tourist places"
+    {
+        "pattern": r"(?:show|list|give|find|tell).+(?:me|us)?.+(?:all|every).+tourist places?",
+        "template": "list_all_places",
+        "params": {"limit": 20}
     },
 ]
 

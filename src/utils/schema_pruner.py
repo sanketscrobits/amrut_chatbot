@@ -192,7 +192,10 @@ QUERY_PATTERNS = [
 
 def get_pruned_schema(user_query: str, enable_pruning: bool = True) -> str:
     """
-    Get relevant schema subset based on query.
+    Get relevant schema subset based on query with improved matching.
+    
+    IMPROVED: Always includes core tables (districts, categories) and uses
+    keyword-based matching to select relevant domain tables.
     
     Args:
         user_query: User's question
@@ -205,17 +208,62 @@ def get_pruned_schema(user_query: str, enable_pruning: bool = True) -> str:
         return SCHEMA_GROUPS["full"]
     
     query_lower = user_query.lower()
+    relevant_groups = set()
     
-    # Match against patterns (first match wins)
-    for pattern, group in QUERY_PATTERNS:
-        if re.search(pattern, query_lower):
-            schema = SCHEMA_GROUPS.get(group, SCHEMA_GROUPS["full"])
-            print(f"✂️ Schema pruned to group: '{group}' (~{len(schema)} chars vs {len(SCHEMA_GROUPS['full'])} full)")
-            return schema
+    # Enhanced keyword mapping with more synonyms
+    keyword_map = {
+        "tourist_places": [
+            "tourist", "place", "places", "attraction", "monument", "temple",
+            "fort", "palace", "heritage", "site", "sightseeing", "visit",
+            "destination", "landmark", "historic", "cultural", "spot"
+        ],
+        "businesses": [
+            "business", "hotel", "restaurant", "shop", "store", "cafe",
+            "market", "mall", "shopping", "accommodation", "lodge", "resort",
+            "service", "vendor", "establishment", "commercial"
+        ],
+        "emergency": [
+            "emergency", "police", "hospital", "ambulance", "fire",
+            "helpline", "medical", "doctor", "clinic", "health", "urgent"
+        ],
+        "safety": [
+            "alert", "safety", "warning", "danger", "caution", "risk",
+            "threat", "security", "safe", "hazard"
+        ]
+    }
     
-    # Default to full schema if no pattern matches
-    print(f"✂️ No pattern matched - using full schema (~{len(SCHEMA_GROUPS['full'])} chars)")
+    # Check which groups are relevant based on keywords
+    for group, keywords in keyword_map.items():
+        if any(keyword in query_lower for keyword in keywords):
+            relevant_groups.add(group)
+    
+    # Special case: if only asking about districts
+    district_only_patterns = ["how many districts", "list districts", "all districts", "count districts"]
+    if any(pattern in query_lower for pattern in district_only_patterns) and not relevant_groups:
+        relevant_groups.add("districts_only")
+    
+    # If we found relevant groups, build combined schema
+    if relevant_groups:
+        # Build combined schema from relevant groups
+        combined_parts = []
+        for group in relevant_groups:
+            combined_parts.append(SCHEMA_GROUPS.get(group, ""))
+        
+        combined_schema = "\n\n".join(combined_parts)
+        
+        full_size = len(SCHEMA_GROUPS["full"])
+        pruned_size = len(combined_schema)
+        reduction = round((1 - pruned_size / full_size) * 100, 1)
+        
+        print(f"✂️ Schema pruned to groups: {list(relevant_groups)}")
+        print(f"✂️ Size: {pruned_size} chars (was {full_size}, {reduction}% reduction)")
+        
+        return combined_schema
+    
+    # Default to full schema if no clear match (safer than guessing)
+    print(f"✂️ No clear keyword match - using full schema for safety (~{len(SCHEMA_GROUPS['full'])} chars)")
     return SCHEMA_GROUPS["full"]
+
 
 
 def get_pruning_stats() -> dict:

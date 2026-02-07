@@ -1,4 +1,7 @@
 from src.schemas.response_schema import ResponseSchema
+
+# OPTIMIZATION Phase 2: Query Expansion for better RAG recall
+from src.utils.query_expansion import expand_query_smart
 from settings import GOOGLE_API_KEY, ORGANIZATION_NAME, DEBUG_MODE
 from src.utils.llm_singleton import get_llm
 from src.tools.query_tool import get_context
@@ -19,8 +22,34 @@ def retriver_agent(state: ResponseSchema) -> ResponseSchema:
         print(f"\n=== RETRIVER_AGENT (LINEAR) CALLED ===")
         print(f"User query: {user_input}")
     
-    # 1. Get Context (Direct Tool Call)
+    # OPTIMIZATION Phase 2: Query Expansion for better RAG recall
+    # Generate 2-3 semantic variations to improve document matching
+    query_variations = expand_query_smart(user_input)
+    
+    if DEBUG_MODE and len(query_variations) > 1:
+        print(f"🔍 Query expansion: Generated {len(query_variations)} variations")
+        for i, variant in enumerate(query_variations):
+            if i > 0:  # Skip original
+                print(f"  Variant {i}: {variant}")
+    
+    # 1. Get Context with query expansion
+    # Try original query first, then fall back to expansions if needed
     context = get_context.func(user_input)
+    
+    # If context is too short and we have expansions, try combining results
+    if len(str(context)) < 200 and len(query_variations) > 1:
+        # Context seems sparse, try getting more with variations
+        expanded_contexts = [context]
+        for variant in query_variations[1:2]:  # Try 1 more variation
+            variant_context = get_context.func(variant)
+            if variant_context and variant_context not in expanded_contexts:
+                expanded_contexts.append(variant_context)
+        
+        # Combine unique contexts
+        context = "\n\n---\n\n".join([str(c) for c in expanded_contexts if c])
+        
+        if DEBUG_MODE:
+            print(f"📚 Combined context from {len(expanded_contexts)} queries ({len(str(context))} chars)")
 
 
     
