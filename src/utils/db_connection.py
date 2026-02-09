@@ -63,8 +63,10 @@ class SupabaseDBPooled:
                 # - sample_rows_in_table_info=0 : Don't sample rows (expensive!)
                 # - view_support=False : Don't query for views
                 # This brings init time from 14s → <1s!
+                from sqlalchemy import MetaData
                 self._db = SQLDatabase(
                     engine=self._engine,
+                    metadata=MetaData(),            # Empty metadata prevents reflection
                     include_tables=[],              # Don't reflect tables
                     sample_rows_in_table_info=0,    # Don't sample rows (MAJOR SPEEDUP!)
                     view_support=False               # Don't query views

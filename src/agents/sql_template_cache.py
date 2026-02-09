@@ -163,7 +163,42 @@ SQL_TEMPLATES = {
         WHERE name_en ILIKE '%{name}%'
         LIMIT 1;
     """,
+    "get_district_description": """
+        SELECT name_en, name_mr, description_en, tourist_highlights_en
+        FROM districts
+        WHERE name_en ILIKE '%{district}%'
+        LIMIT 1;
+    """,
 }
+
+# Demo Script Categories and Examples
+# This section is for documentation purposes, illustrating the capabilities of the SQL Agent.
+
+## 1. SQL Agent (Factual & Structured Data)
+# *Showcases the fixed schema pruning, joining, and expanded template matching.*
+
+# | Category | Query | Expected Outcome |
+# | :--- | :--- | :--- |
+# | **Statistics** | "How many districts are in Maharashtra?" | **36** (Shows precise counting) |
+# | **Demographics** | "What is the population of Solapur?" | **1.4 Million** (Shows factual retrieval) |
+# | **District Comparisons** | "Which district has the highest population?" | **Washim** (Shows aggregation/ordering) |
+# | **Tourism** | "Tell me about Pune district" | **Pune District Info** (Shows complex description retrieval) |
+# | **Local Attractions** | "Show me tourist places in Kolhapur" | **List of Places** (Shows SQL JOIN functionality) |
+# | **Specific Categories** | "List all forts in Maharashtra" | **Historical Forts** (Shows category filtering) |
+# | **Details** | "What is the entry fee for Aga Khan Palace?" | **₹25 / ₹300** (Shows specific attribute lookup) |
+# | **Timing** | "When is the best time to visit Nagpur?" | **Winter (Oct to Feb)** (Shows column-specific retrieval) |
+
+## 2. Emergency Services & Businesses
+# *Showcases the local search and connection between entities.*
+
+# | Category | Query | Expected Outcome |
+# | :--- | :--- | :--- |
+# | **Emergency** | "List hospitals in Pune" | **Ruby Hall, Sancheti, etc.** (Shows service filtering) |
+# | **Police** | "Find police stations in Nashik" | **List of Stations** (Shows service type filtering) |
+# | **Convenience** | "Are there any public toilets in Mumbai?" | **List of Toilets** (Shows niche service lookup) |
+# | **Services** | "Are there any taxi services in Pune?" | **Pune Taxi Service** (Shows business description matching) |
+# | **Local Professional Services** | "Find a tourism guide for forts" | **Rahul Tourism Guide** (Shows skill-based business lookup) |
+# | **Hospitality** | "Suggest some homestays or hotels in Pune" | **Sahyadri Homestay, etc.** (Shows multi-line rich responses) |
 
 # Helper to assist with singularization
 def singularize(word):
@@ -207,6 +242,40 @@ def singularize(word):
 
 # EXPANDED: Pattern matchers (6 → 20+ patterns)
 QUERY_PATTERNS = [
+    # --- HIGH PRIORITY: SPECIFIC ENTITIES ---
+    {
+        "pattern": r"(?:entry fee|ticket|cost|price).*(?:for|of)\s+([a-zA-Z\s]+)",
+        "template": "get_place_entry_fee",
+        "extractor": lambda m: {"place": m.group(1).strip("?.! ")}
+    },
+    {
+        "pattern": r"(?:opening hours|timing|when does it open|open hours).*(?:of|for)\s+([a-zA-Z\s]+)",
+        "template": "get_place_hours", 
+        "extractor": lambda m: {"place": m.group(1).strip("?.! ")}
+    },
+    {
+        "pattern": r"(?:tell me about|describe|info on|details of|what is)\s+([a-zA-Z\s]+?)\s+(?:fort|temple|museum|place|monument|attraction|palace|cave|garden|park|dam|lake)",
+        "template": "get_place_description",
+        "extractor": lambda m: {"place": m.group(1).strip("?.! ")}
+    },
+    {
+        "pattern": r"(?:tell me about|describe|info on|details of|what is)\s+([a-zA-Z\s]+?)(?:\s+district|\s+city|\s+location)",
+        "template": "get_district_description",
+        "extractor": lambda m: {"district": m.group(1).strip("?.! ")}
+    },
+    {
+        "pattern": r"(?:tell me about|describe|info on|details of|what is)\s+([a-zA-Z\s]+)",
+        "template": "get_place_description",
+        "extractor": lambda m: {"place": m.group(1).strip("?.! ")}
+    },
+    
+    # --- MEDIUM PRIORITY: ATTRIBUTES & COUNTS ---
+    {
+        "pattern": r"(?:what is the\s+)?population of ([a-zA-Z\s]+)",
+        "template": "get_district_population",
+        "extractor": lambda m: {"district": m.group(1).strip("?.! ")}
+    },
+    
     # Original patterns
     {
         "pattern": r"(?:show|list|give|find).+(?:all|every).+(?:tourist place|attraction|monument|heritage|site|sightseeing)",
@@ -251,7 +320,12 @@ QUERY_PATTERNS = [
         "extractor": lambda m: {"district": m.group(1).strip("?.! ")}
     },
     {
-        "pattern": r"(?:info|information|details?).+district.+(\w+)",
+        "pattern": r"(?:info|information|details?|tell me about|what is).+district.+(\w+)",
+        "template": "district_by_name",
+        "extractor": lambda m: {"district": m.group(1).strip("?.! ")}
+    },
+    {
+        "pattern": r"(?:info|information|details?|tell me about|what is).+(\w+).+district",
         "template": "district_by_name",
         "extractor": lambda m: {"district": m.group(1).strip("?.! ")}
     },
@@ -287,13 +361,8 @@ QUERY_PATTERNS = [
 
     # NEW: Detailed Templates for CSV Analysis (Population, Best Time, Etc)
     {
-        "pattern": r"(?:what is the\s+)?population of (.+)",
+        "pattern": r"(?:how many people|population).+(?:in|at|of)\s+([a-zA-Z]+)",
         "template": "get_district_population",
-        "extractor": lambda m: {"district": m.group(1).strip("?.! ")}
-    },
-    {
-        "pattern": r"(?:tell me about|info on|details of)\s+(.+) district",
-        "template": "get_district_description",
         "extractor": lambda m: {"district": m.group(1).strip("?.! ")}
     },
     {
@@ -301,20 +370,28 @@ QUERY_PATTERNS = [
         "template": "get_best_time_visit_district",
         "extractor": lambda m: {"district": m.group(1).strip("?.! ")}
     },
-    
-    # Places details
     {
-        "pattern": r"entry fee (?:for|of) (.+)",
+        "pattern": r"(?:when should I visit|best month to visit|best time for)\s+([a-zA-Z\s]+)",
+        "template": "get_best_time_visit_district",
+        "extractor": lambda m: {"district": m.group(1).strip("?.! ")}
+    },
+    {
+        "pattern": r"(?:entry fee|ticket|cost|price).*(?:for|of)\s+([a-zA-Z\s]+)",
         "template": "get_place_entry_fee",
         "extractor": lambda m: {"place": m.group(1).strip("?.! ")}
     },
     {
-        "pattern": r"opening hours (?:of|for) (.+)",
+        "pattern": r"(?:opening hours|timing|when does it open|open hours).*(?:of|for)\s+(.+)",
         "template": "get_place_hours", 
         "extractor": lambda m: {"place": m.group(1).strip("?.! ")}
     },
     {
-        "pattern": r"tell me about (.+) (?:fort|temple|museum|place)",
+        "pattern": r"(?:tell me about|describe|info on|details of)\s+(.+) (?:fort|temple|museum|place|monument|attraction)",
+        "template": "get_place_description",
+        "extractor": lambda m: {"place": m.group(1).strip("?.! ")}
+    },
+    {
+        "pattern": r"(?:tell me about|describe|info on|details of)\s+(.+)",
         "template": "get_place_description",
         "extractor": lambda m: {"place": m.group(1).strip("?.! ")}
     },

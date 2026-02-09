@@ -8,9 +8,47 @@ instead of the entire database schema for SQL generation.
 import re
 from src.utils.schema_context import DB_SCHEMA_CONTEXT
 
+# Schema components for reuse
+DISTRICTS_DDL = """
+CREATE TABLE districts (
+	id UUID DEFAULT gen_random_uuid() NOT NULL, 
+	name_en TEXT NOT NULL, 
+	name_mr TEXT NOT NULL, 
+	slug TEXT NOT NULL, 
+	description_en TEXT, 
+	description_mr TEXT, 
+	lat NUMERIC(10, 8), 
+	lng NUMERIC(11, 8), 
+	population TEXT, 
+	area_km2 TEXT, 
+	tourist_highlights_en TEXT, 
+	tourist_highlights_mr TEXT, 
+	best_time_to_visit_en TEXT, 
+	best_time_to_visit_mr TEXT, 
+	image_url TEXT, 
+	created_at TIMESTAMP WITHOUT TIME ZONE DEFAULT now(), 
+	updated_at TIMESTAMP WITHOUT TIME ZONE DEFAULT now(), 
+	CONSTRAINT districts_pkey PRIMARY KEY (id), 
+	CONSTRAINT districts_slug_key UNIQUE NULLS DISTINCT (slug)
+)
+"""
+
+CATEGORIES_DDL = """
+CREATE TABLE categories (
+	id UUID DEFAULT gen_random_uuid() NOT NULL, 
+	name_en TEXT NOT NULL, 
+	name_mr TEXT NOT NULL, 
+	icon_name TEXT, 
+	created_at TIMESTAMP WITHOUT TIME ZONE DEFAULT now(), 
+	image_url TEXT, 
+	CONSTRAINT categories_pkey PRIMARY KEY (id), 
+	CONSTRAINT categories_name_en_key UNIQUE NULLS DISTINCT (name_en)
+)
+"""
+
 # Schema groups: Only include relevant tables for each query type
 SCHEMA_GROUPS = {
-    "tourist_places": """
+    "tourist_places": f"""
 CREATE TABLE tourist_places (
 	id UUID DEFAULT gen_random_uuid() NOT NULL, 
 	district_id UUID NOT NULL, 
@@ -38,41 +76,12 @@ CREATE TABLE tourist_places (
 	CONSTRAINT tourist_places_district_id_fkey FOREIGN KEY(district_id) REFERENCES districts (id) ON DELETE CASCADE
 )
 
-CREATE TABLE districts (
-	id UUID DEFAULT gen_random_uuid() NOT NULL, 
-	name_en TEXT NOT NULL, 
-	name_mr TEXT NOT NULL, 
-	slug TEXT NOT NULL, 
-	description_en TEXT, 
-	description_mr TEXT, 
-	lat NUMERIC(10, 8), 
-	lng NUMERIC(11, 8), 
-	population TEXT, 
-	area_km2 TEXT, 
-	tourist_highlights_en TEXT, 
-	tourist_highlights_mr TEXT, 
-	best_time_to_visit_en TEXT, 
-	best_time_to_visit_mr TEXT, 
-	image_url TEXT, 
-	created_at TIMESTAMP WITHOUT TIME ZONE DEFAULT now(), 
-	updated_at TIMESTAMP WITHOUT TIME ZONE DEFAULT now(), 
-	CONSTRAINT districts_pkey PRIMARY KEY (id), 
-	CONSTRAINT districts_slug_key UNIQUE NULLS DISTINCT (slug)
-)
+{DISTRICTS_DDL}
 
-CREATE TABLE categories (
-	id UUID DEFAULT gen_random_uuid() NOT NULL, 
-	name_en TEXT NOT NULL, 
-	name_mr TEXT NOT NULL, 
-	icon_name TEXT, 
-	created_at TIMESTAMP WITHOUT TIME ZONE DEFAULT now(), 
-	image_url TEXT, 
-	CONSTRAINT categories_pkey PRIMARY KEY (id), 
-	CONSTRAINT categories_name_en_key UNIQUE NULLS DISTINCT (name_en)
-)
+{CATEGORIES_DDL}
 """,
     
-    "businesses": """
+    "businesses": f"""
 CREATE TABLE local_businesses (
 	id UUID DEFAULT gen_random_uuid() NOT NULL, 
 	user_id UUID, 
@@ -100,11 +109,12 @@ CREATE TABLE local_businesses (
 	CONSTRAINT local_businesses_district_id_fkey FOREIGN KEY(district_id) REFERENCES districts (id) ON DELETE CASCADE
 )
 
-CREATE TABLE districts (...)
-CREATE TABLE categories (...)
+{DISTRICTS_DDL}
+
+{CATEGORIES_DDL}
 """,
     
-    "emergency": """
+    "emergency": f"""
 CREATE TABLE emergency_services (
 	id UUID DEFAULT gen_random_uuid() NOT NULL, 
 	district_id UUID NOT NULL, 
@@ -121,10 +131,10 @@ CREATE TABLE emergency_services (
 	CONSTRAINT emergency_services_district_id_fkey FOREIGN KEY(district_id) REFERENCES districts (id) ON DELETE CASCADE
 )
 
-CREATE TABLE districts (...)
+{DISTRICTS_DDL}
 """,
     
-    "safety": """
+    "safety": f"""
 CREATE TABLE safety_alerts (
 	id UUID DEFAULT gen_random_uuid() NOT NULL, 
 	district_id UUID NOT NULL, 
@@ -141,32 +151,10 @@ CREATE TABLE safety_alerts (
 	CONSTRAINT safety_alerts_severity_check CHECK (severity = ANY (ARRAY['low'::text, 'medium'::text, 'high'::text]))
 )
 
-CREATE TABLE districts (...)
+{DISTRICTS_DDL}
 """,
     
-    "districts_only": """
-CREATE TABLE districts (
-	id UUID DEFAULT gen_random_uuid() NOT NULL, 
-	name_en TEXT NOT NULL, 
-	name_mr TEXT NOT NULL, 
-	slug TEXT NOT NULL, 
-	description_en TEXT, 
-	description_mr TEXT, 
-	lat NUMERIC(10, 8), 
-	lng NUMERIC(11, 8), 
-	population TEXT, 
-	area_km2 TEXT, 
-	tourist_highlights_en TEXT, 
-	tourist_highlights_mr TEXT, 
-	best_time_to_visit_en TEXT, 
-	best_time_to_visit_mr TEXT, 
-	image_url TEXT, 
-	created_at TIMESTAMP WITHOUT TIME ZONE DEFAULT now(), 
-	updated_at TIMESTAMP WITHOUT TIME ZONE DEFAULT now(), 
-	CONSTRAINT districts_pkey PRIMARY KEY (id), 
-	CONSTRAINT districts_slug_key UNIQUE NULLS DISTINCT (slug)
-)
-""",
+    "districts_only": DISTRICTS_DDL,
     
     "full": DB_SCHEMA_CONTEXT  # Fallback to full schema
 }

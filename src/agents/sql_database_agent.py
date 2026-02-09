@@ -49,8 +49,8 @@ def query_database_chain(user_input: str):
     """
     t0 = time.time()
     try:
-        # Wrap entire chain in 10-second timeout (increased for complex queries)
-        with timeout(10):
+        # Wrap entire chain in 30-second timeout (remote DB can be slow)
+        with timeout(30):
             # 1. Setup
             llm = get_llm(model="gemini-2.5-flash", temperature=0)
             db = get_supabase_db()  # Singleton (fast if already warm)
@@ -97,7 +97,7 @@ def query_database_chain(user_input: str):
                 print(f"[SQL_AGENT] Cache hit! Total time: {t_cache-t0:.2f}s")
                 return cached_result
 
-            # 3. Execute SQL with 3-second timeout
+            # 3. Execute SQL with 12-second timeout (Supabase cold starts can take time)
             execute_tool = QuerySQLDataBaseTool(db=db)
             # Handle cases where LLM might return explanatory text
             if "SELECT" not in sql_query.upper():
@@ -105,7 +105,7 @@ def query_database_chain(user_input: str):
                  return ""
             
             # Execute with timeout
-            with timeout(3):
+            with timeout(12):
                 db_result = execute_tool.invoke(sql_query)
             
             t3 = time.time()

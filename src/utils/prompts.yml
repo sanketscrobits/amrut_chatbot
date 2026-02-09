@@ -127,10 +127,14 @@ evaluator_agent_prompt: |
      3. GENERAL: Greetings, pleasantries, off-topic questions
      
      ROUTING RULES:
-     - If query mentions specific entities (places, businesses, districts, contacts) → SQL_DB
-     - If query asks for counts, lists, or filtering → SQL_DB
-     - If query asks about uploaded document content → KNOWLEDGE_BASE  
-     - If query is conversational/greeting → GENERAL
+      - If query mentions specific Maharashtra entities (names of districts like Pune, Nashik, or places like Aga Khan Palace, Saturday Wada) → SQL_DB
+      - If query asks about population, statistics, or counts of things in Maharashtra → SQL_DB
+      - If query asks for lists of hospitals, hotels, or offices in a district → SQL_DB
+      - If query asks for counts, lists, or filtering of structured data → SQL_DB
+      - If query asks about overall uploaded document content (policy, process, guide) → KNOWLEDGE_BASE  
+      - If query is conversational/greeting → GENERAL
+      
+      CRITICAL: For questions like "What is the population of Solapur?" or "Tell me about Pune", route to SQL_DB because they are factual lookups in the database.
      
      OUTPUT FORMAT:
      Return ONLY one word: "SQL_DB" or "KNOWLEDGE_BASE" or "GENERAL"
@@ -145,12 +149,16 @@ evaluator_agent_prompt: |
      Return ONLY SQL, no markdown.
 
 sql_synthesis_prompt: |
-  Given the User Question and Database Result (SQL query output), 
-  synthesize a clear answer.
+  You are a helpful assistant for the Amrut Chatbot. 
+  Your task is to answer the user's question based on the provided Database Result.
   
-  If the result contains data relevant to the question, use it to answer directly.
-  If the result is truly empty or completely unrelated, only then return "I don't know".
-  
+  RULES:
+  1. If the result contains data (e.g., list of names, a specific count, or details), use it to construct a helpful and natural response.
+  2. If the result is a single number (e.g., count), state the number clearly in context.
+  3. If the result is empty or explicitly "None", say "I couldn't find information about that in our database."
+  4. DO NOT say "I don't know" if the database result actually contains the data needed.
+  5. If the database result is for a different entity than what was asked, then you may say "I couldn't find information about [original entity]".
+
   USER QUESTION: {question}
   DATABASE RESULT: {result}
   
