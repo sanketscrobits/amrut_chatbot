@@ -149,7 +149,7 @@ async def chatbot_endpoint(request: ChatRequest):
             "needs_escalation": False
         }
 
-        final_state = workflow.invoke(initial_state, config={"verbose": True})
+        final_state = await workflow.ainvoke(initial_state, config={"verbose": True})
         print("Workflow final state:", final_state)
 
         query_response = final_state.get("query_response", "No response generated.")
@@ -303,8 +303,7 @@ async def chatbot_stream_endpoint(request: ChatRequest):
             }
             
             # Run workflow (awaiting full execution)
-            Loop = asyncio.get_event_loop()
-            final_state = await Loop.run_in_executor(None, workflow.invoke, initial_state)
+            final_state = await workflow.ainvoke(initial_state)
             
             query_response = final_state.get("query_response", "No response generated.")
             

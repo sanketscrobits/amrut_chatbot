@@ -246,34 +246,51 @@ QUERY_PATTERNS = [
     {
         "pattern": r"(?:entry fee|ticket|cost|price).*(?:for|of)\s+([a-zA-Z\s]+)",
         "template": "get_place_entry_fee",
-        "extractor": lambda m: {"place": m.group(1).strip("?.! ")}
+        "extractor": lambda m: {"place": m.group(1).replace("district", "").replace("city", "").strip("?.! ")}
     },
     {
         "pattern": r"(?:opening hours|timing|when does it open|open hours).*(?:of|for)\s+([a-zA-Z\s]+)",
         "template": "get_place_hours", 
-        "extractor": lambda m: {"place": m.group(1).strip("?.! ")}
+        "extractor": lambda m: {"place": m.group(1).replace("district", "").replace("city", "").strip("?.! ")}
     },
     {
         "pattern": r"(?:tell me about|describe|info on|details of|what is)\s+([a-zA-Z\s]+?)\s+(?:fort|temple|museum|place|monument|attraction|palace|cave|garden|park|dam|lake)",
         "template": "get_place_description",
-        "extractor": lambda m: {"place": m.group(1).strip("?.! ")}
+        "extractor": lambda m: {"place": m.group(1).replace("district", "").replace("city", "").strip("?.! ")}
     },
     {
         "pattern": r"(?:tell me about|describe|info on|details of|what is)\s+([a-zA-Z\s]+?)(?:\s+district|\s+city|\s+location)",
         "template": "get_district_description",
-        "extractor": lambda m: {"district": m.group(1).strip("?.! ")}
+        "extractor": lambda m: {"district": m.group(1).replace("district", "").replace("city", "").strip("?.! ")}
     },
     {
         "pattern": r"(?:tell me about|describe|info on|details of|what is)\s+([a-zA-Z\s]+)",
         "template": "get_place_description",
-        "extractor": lambda m: {"place": m.group(1).strip("?.! ")}
+        "extractor": lambda m: {"place": m.group(1).replace("district", "").replace("city", "").strip("?.! ")}
     },
     
     # --- MEDIUM PRIORITY: ATTRIBUTES & COUNTS ---
     {
         "pattern": r"(?:what is the\s+)?population of ([a-zA-Z\s]+)",
         "template": "get_district_population",
-        "extractor": lambda m: {"district": m.group(1).strip("?.! ")}
+        "extractor": lambda m: {"district": m.group(1).replace("district", "").replace("city", "").strip("?.! ")}
+    },
+    
+    # NEW: Marathi Support
+    {
+        "pattern": r"([^ ]+)\s+जिल्ह्याची माहिती द्या",
+        "template": "get_district_description",
+        "extractor": lambda m: {"district": m.group(1).strip()}
+    },
+    {
+        "pattern": r"([^ ]+)\s+जिल्ह्याचे वर्णन करा",
+        "template": "get_district_description",
+        "extractor": lambda m: {"district": m.group(1).strip()}
+    },
+    {
+        "pattern": r"([^ ]+)\s+मध्ये कोणती पर्यटन स्थळे आहेत?",
+        "template": "places_in_district",
+        "extractor": lambda m: {"district": m.group(1).strip(), "limit": 10}
     },
     
     # Original patterns

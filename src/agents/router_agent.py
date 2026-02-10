@@ -1,4 +1,5 @@
 from datetime import datetime, timedelta
+import asyncio
 import hashlib
 import os
 from langchain_core.prompts import ChatPromptTemplate
@@ -98,7 +99,7 @@ def get_router_chain():
     chain = prompt | llm | StrOutputParser()
     return chain
 
-def router_agent_node(state: ResponseSchema) -> ResponseSchema:
+async def router_agent_node(state: ResponseSchema) -> ResponseSchema:
     """
     Classify the user query to determine the best data source.
     Uses caching to avoid repeated LLM calls for similar queries.
@@ -115,7 +116,7 @@ def router_agent_node(state: ResponseSchema) -> ResponseSchema:
         
         # OPTIMIZATION: Check if query matches a known SQL template
         # If it does, we can skip the LLM router significantly reducing latency and ensuring accuracy
-        template_sql = get_sql_from_template(user_input)
+        template_sql = await asyncio.to_thread(get_sql_from_template, user_input)
         if template_sql:
             if DEBUG_MODE:
                  print(f"Router Optimization: SQL Template matched. Forcing SQL_DB route.")
@@ -125,7 +126,7 @@ def router_agent_node(state: ResponseSchema) -> ResponseSchema:
         
         # Cache miss: run LLM classification
         chain = get_router_chain()
-        result = chain.invoke({"input": user_input})
+        result = await chain.ainvoke({"input": user_input})
 
         decision = result.strip().upper()
         

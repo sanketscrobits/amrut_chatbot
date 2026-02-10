@@ -150,8 +150,13 @@ def cache_semantic_response(query: str, response: dict, ttl: int = 900):
         semantic_index = get_cache("semantic:index") or {}
         
         # Add this query to the index
+        if hasattr(query_embedding, "tolist"):
+            emb_list = query_embedding.tolist()
+        else:
+            emb_list = query_embedding
+            
         semantic_index[query] = {
-            "embedding": query_embedding.tolist(),  # Convert numpy array to list
+            "embedding": emb_list,
             "cache_key": cache_key
         }
         

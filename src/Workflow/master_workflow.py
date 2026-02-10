@@ -1,13 +1,17 @@
 from langgraph.graph import StateGraph, START, END
+import asyncio
 from langchain_google_genai import ChatGoogleGenerativeAI
 from settings import GOOGLE_API_KEY 
 from src.agents.evaluator_agent import evaluator_agent
 from src.agents.retriver_agent import retriver_agent
+from datetime import datetime, timedelta
 from src.agents.response_enricher import response_enricher_node
 from src.schemas.response_schema import ResponseSchema
 from src.agents.sql_database_agent import sql_agent_node
 from src.agents.weather_enricher import weather_enricher_node
 from src.agents.router_agent import router_agent_node
+from src.agents.supabase_mcp_agent import supabase_mcp_agent_node   # <--- Import MCP Agent
+from src.utils.config import USE_MCP_AGENT                          # <--- Import Flag
 
 model = ChatGoogleGenerativeAI(model="gemini-2.5-flash", google_api_key=GOOGLE_API_KEY)
 
@@ -32,12 +36,14 @@ def intent_routing_edge(state: ResponseSchema):
     """Route based on Intent Router decision."""
     source = state.get("data_source", "retriever")
     if source == "sql":
+        if USE_MCP_AGENT:
+             return "supabase_mcp_agent"  # <--- Route to MCP Agent
         return "sql_agent"
     return "retriver_agent"
 
 def sql_routing_edge(state: ResponseSchema):
     """Route based on whether SQL agent found an answer."""
-    # If SQL agent returned a valid response, go to enricher
+    # If SQL/MCP agent returned a valid response, go to enricher
     if state.get("query_response") and state.get("data_source") == "sql":
         return "response_enricher"
     # Fallback to retriever
@@ -84,39 +90,49 @@ def retriever_routing_edge(state: ResponseSchema):
 
 from src.agents.pre_processor import pre_processor_node
 
-def atomic_workflow(state: ResponseSchema) -> ResponseSchema:
+async def atomic_workflow(state: ResponseSchema) -> ResponseSchema:
     """
-    Executes the entire chatbot pipeline as a single atomic step.
-    This bypasses LanGraph state merging conflicts and reduces overhead.
+    Executes the entire chatbot pipeline as a single async atomic step.
+    This bypasses LangGraph state merging conflicts and reduces overhead.
     """
-    # 1. Pre-processing (Weather + Router)
-    pre_res = pre_processor_node(state)
+    # 1. Pre-processing (Weather + Router) - Now Async
+    pre_res = await pre_processor_node(state)
     state.update(pre_res)
     
     # 2. Intent Routing & Data Retrieval
     source = intent_routing_edge(state)
     
-    if source == "sql_agent":
-        # Try SQL
-        sql_res = sql_agent_node(state)
+    if source == "supabase_mcp_agent":
+        # Execute Supabase MCP Agent (Async)
+        sql_res = await supabase_mcp_agent_node(state)
         state.update(sql_res)
         
-        # FIX: Only fallback if SQL execution FAILED (not just empty results)
-        # Check for sql_empty_result marker to avoid unnecessary retriever calls
+        # Check if successful
+        next_step = sql_routing_edge(state)
+        if next_step == "retriver_agent":
+            # Fallback to Retriever (Async)
+            ret_res = await retriver_agent(state)
+            state.update(ret_res)
+            
+    elif source == "sql_agent":
+        # Legacy SQL Agent (Sync version) - run in thread for safety
+        sql_res = await asyncio.to_thread(sql_agent_node, state)
+        state.update(sql_res)
+        
         if not state.get("query_response") and not state.get("sql_empty_result"):
-            ret_res = retriver_agent(state)
+            ret_res = await retriver_agent(state)
             state.update(ret_res)
     else:
-        # Direct to Retriever
-        ret_res = retriver_agent(state)
+        # Direct to Retriever (Async)
+        ret_res = await retriver_agent(state)
         state.update(ret_res)
     
-    # 3. Response Enrichment
-    enr_res = response_enricher_node(state)
+    # 3. Response Enrichment (Sync-ish) - run in thread
+    enr_res = await asyncio.to_thread(response_enricher_node, state)
     state.update(enr_res)
     
-    # 4. Evaluation (Basic pass)
-    eval_res = evaluator_agent(state)
+    # 4. Evaluation (Sync-ish) - run in thread
+    eval_res = await asyncio.to_thread(evaluator_agent, state)
     state.update(eval_res)
     
     return {

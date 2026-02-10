@@ -1,4 +1,5 @@
 from src.schemas.response_schema import ResponseSchema
+import asyncio
 
 # OPTIMIZATION Phase 2: Query Expansion for better RAG recall
 from src.utils.query_expansion import expand_query_smart
@@ -8,7 +9,7 @@ from src.tools.query_tool import get_context
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.output_parsers import StrOutputParser
 
-def retriver_agent(state: ResponseSchema) -> ResponseSchema:
+async def retriver_agent(state: ResponseSchema) -> ResponseSchema:
     """
     Direct RAG Chain: get_context -> LLM Synthesis.
     Replaces the previous multi-pass ReAct agent for 60% faster retrieval.
@@ -34,14 +35,14 @@ def retriver_agent(state: ResponseSchema) -> ResponseSchema:
     
     # 1. Get Context with query expansion
     # Try original query first, then fall back to expansions if needed
-    context = get_context.func(user_input)
+    context = await asyncio.to_thread(get_context.func, user_input)
     
     # If context is too short and we have expansions, try combining results
     if len(str(context)) < 200 and len(query_variations) > 1:
         # Context seems sparse, try getting more with variations
         expanded_contexts = [context]
         for variant in query_variations[1:2]:  # Try 1 more variation
-            variant_context = get_context.func(variant)
+            variant_context = await asyncio.to_thread(get_context.func, variant)
             if variant_context and variant_context not in expanded_contexts:
                 expanded_contexts.append(variant_context)
         
@@ -51,10 +52,8 @@ def retriver_agent(state: ResponseSchema) -> ResponseSchema:
         if DEBUG_MODE:
             print(f"📚 Combined context from {len(expanded_contexts)} queries ({len(str(context))} chars)")
 
-
-    
     # 2. Prepare Prompt
-    llm = get_llm(temperature=0.1)
+    llm = get_llm(model="gemini-2.5-flash", temperature=0.1)
     
     # Simple direct prompt for faster synthesis
     prompt = ChatPromptTemplate.from_messages([
@@ -67,7 +66,7 @@ def retriver_agent(state: ResponseSchema) -> ResponseSchema:
     chain = prompt | llm | StrOutputParser()
     
     # 3. Generate Response
-    response_str = chain.invoke({
+    response_str = await chain.ainvoke({
         "context": context,
         "query": user_input,
         "instruction": instruction or "Answer clearly and concisely."
