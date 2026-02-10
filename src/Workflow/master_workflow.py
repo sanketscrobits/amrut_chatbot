@@ -101,9 +101,8 @@ def atomic_workflow(state: ResponseSchema) -> ResponseSchema:
         sql_res = sql_agent_node(state)
         state.update(sql_res)
         
-        # FIX: Only fallback if SQL execution FAILED (not just empty results)
-        # Check for sql_empty_result marker to avoid unnecessary retriever calls
-        if not state.get("query_response") and not state.get("sql_empty_result"):
+        # Fallback to retriever if SQL returned no data
+        if not state.get("query_response"):
             ret_res = retriver_agent(state)
             state.update(ret_res)
     else:

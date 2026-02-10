@@ -15,7 +15,14 @@ ESCALATION_PATTERNS = [
     "no information",
     "max retries exceeded",
     "sorry, i am not able to help",
-    "please try asking something different"
+    "please try asking something different",
+    "couldn't find information",
+    "could not find information",
+    "माहिती नाही",
+    "माहिती उपलब्ध नाही",
+    "क्षमस्व",
+    "उपलब्ध नाही",
+    "कोणतीही माहिती सापडली नाही"
 ]
 
 def check_needs_escalation(response: str) -> bool:

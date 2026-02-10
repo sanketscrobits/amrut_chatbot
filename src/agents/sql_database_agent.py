@@ -158,29 +158,17 @@ def sql_agent_node(state: ResponseSchema) -> ResponseSchema:
     if intent == "sql":
         response = query_database_chain(user_input)
 
-        # Check if response contains meaningful data
-        if response and "I don't know" not in response and "no information" not in response.lower():
+        if response:
              return {
                 "query_response": response,
                 "data_source": "sql",
                 "needs_escalation": False
             }
-        
-        # OPTIMIZATION: Empty SQL results - return helpful message instead of retriever fallback
-        # This saves 3-5s by avoiding unnecessary retriever call
-        if response and ("I don't know" in response or "no information" in response.lower()):
-            return {
-                "query_response": "I couldn't find any data for that location in our database. This information may not be available yet.",
-                "data_source": "sql",
-                "needs_escalation": False,
-                "sql_empty_result": True  # FIX: Marker to prevent retriever fallback
-            }
     
-    
-    # Fallback to retriever only if SQL execution failed (not just empty results)
+    # Fallback to retriever only if SQL execution failed or returned no data
     return {
         "query_response": "",
-        "data_source": "", # Empty source triggers next step fallback
+        "data_source": "", 
         "needs_escalation": False
     }
 
