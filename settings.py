@@ -24,3 +24,19 @@ SUPABASE_DB_PORT = getenv("SUPABASE_DB_PORT", "5432")
 SUPABASE_DB_NAME = getenv("SUPABASE_DB_NAME", "postgres")
 SUPABASE_DB_USER = getenv("SUPABASE_DB_USER")
 SUPABASE_DB_PASSWORD = getenv("SUPABASE_DB_PASSWORD")
+
+# Weather Configuration
+OPENWEATHER_API_KEY = getenv("OPENWEATHER_API_KEY")
+
+# Weaviate Vector Database Configuration
+WEAVIATE_URL = getenv("WEAVIATE_URL", "http://localhost:8080")
+WEAVIATE_API_KEY = getenv("WEAVIATE_API_KEY", None)  # Optional for local instances
+WEAVIATE_COLLECTION_NAME = getenv("WEAVIATE_COLLECTION_NAME", "AmrutChatbotDocs")
+
+# Vector Database Selection
+VECTOR_DB_TYPE = getenv("VECTOR_DB_TYPE", "weaviate")  # "pinecone" or "weaviate"
+
+NAMESPACE = getenv("NAMESPACE")
+
+# Performance & Debugging Configuration
+DEBUG_MODE = True

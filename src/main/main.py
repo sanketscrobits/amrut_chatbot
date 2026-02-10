@@ -72,7 +72,7 @@ async def receive_whatsapp(request: Request):
     # Call your AI agent
     try:
         initial_state = {
-            "user_query": text,
+            "user_input": text,
             "query_response": "",
             "evaluation_state": "",
             "retry_count": 0,

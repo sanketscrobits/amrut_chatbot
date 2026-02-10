@@ -126,7 +126,7 @@ Query-Agent/
 ### Run the API server
 
 ```sh
-uv pip run python -m src.main.main
+uv run uvicorn src.main.chatbotapi:app --reload --host 0.0.0.0 --port 8000
 ```
 
 ### Interact with the agent
