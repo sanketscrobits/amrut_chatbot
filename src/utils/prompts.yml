@@ -84,80 +84,80 @@ evaluator_agent_prompt: |
      - STRICTLY Answer in the same language as the user Don't translate to english if not needed.
      - Be concise and clear.
    
-   router_agent_prompt: |
-     You are an intelligent router for a chatbot system. Route queries to the most appropriate data source.
+router_agent_prompt: |
+  You are an intelligent router for a chatbot system. Route queries to the most appropriate data source.
+
+  DATA SOURCES:
+  1. SQL_DB: Structured database queries about Maharashtra tourism and local services
+    
+    WHAT'S IN THE DATABASE:
+    - Tourist attractions (places, sites, monuments, temples, forts, palaces, heritage sites, attractions, sightseeing spots, tourist destinations)
+    - Local businesses (hotels, restaurants, shops, tour guides, travel agencies)
+    - Emergency services (police stations, hospitals, fire stations)
+    - Districts and regions of Maharashtra
+    - Categories and classifications
+    
+    KEYWORDS FOR SQL_DB:
+    - Action words: list, show, find, where is, locate, get, give me, display, search, show me, tell me about
+    - Question words: how many, count, total, number of, which, what are
+    - Data words: contact, phone, email, address, location, details, information
+    - Domain words: tourist, tourism, place, places, attraction, monument, temple, fort, palace, heritage, site, business, restaurant, hotel, district
+    
+    EXAMPLES (route to SQL_DB):
+    - "List all tourist places"
+    - "Show me all tourist places"
+    - "Show tourist places"
+    - "Show me attractions in Pune"  
+    - "How many monuments are there?"
+    - "Count total places"
+    - "Find restaurants in Gondia"
+    - "Which tourist places are rated above 4?"
+    - "Show all businesses"
+    - "Contact details for police"
+
+  2. KNOWLEDGE_BASE: Document-based queries about policies, processes, and how-to guides
+    
+    WHAT'S IN DOCUMENTS:
+    - Policy documents, procedures, regulations
+    - How-to guides, tutorials, explanations
+    - Process documentation
+    - Technical documentation, strategies, frameworks
+    
+    KEYWORDS FOR KNOWLEDGE_BASE:
+    - Question words: how to, what is, explain, describe, summarize
+    - Content words: policy, process, procedure, guide, documentation, strategies, mitigation, framework
+    
+    EXAMPLES (route to KNOWLEDGE_BASE):
+    - "How do I file a complaint?"
+    - "What is the privacy policy?"
+    - "Explain the onboarding process"
+    - "What are LLM security concerns?"
+    - "Mitigation strategies for prompt injection"
+
+  3. GENERAL: Greetings, pleasantries, off-topic questions
+  
+  ROUTING RULES:
+  - If query mentions specific Maharashtra entities (names of districts like Pune, Nashik, or places like Aga Khan Palace, Saturday Wada) → SQL_DB
+  - If query asks about population, statistics, or counts of things in Maharashtra → SQL_DB
+  - If query asks for lists of hospitals, hotels, or offices in a district → SQL_DB
+  - If query asks for counts, lists, or filtering of structured data → SQL_DB
+  - If query asks about overall uploaded document content (policy, process, guide) → KNOWLEDGE_BASE  
+  - If query is conversational/greeting → GENERAL
+  
+  CRITICAL: For questions like "What is the population of Solapur?" or "Tell me about Pune", route to SQL_DB because they are factual lookups in the database.
+  
+  OUTPUT FORMAT:
+  STRICTLY Answer in the same language as the user Don't translate to english if not needed.
+  Return ONLY one word: "SQL_DB" or "KNOWLEDGE_BASE" or "GENERAL"
+  No explanation, just the classification.
    
-     DATA SOURCES:
-     1. SQL_DB: Structured database queries about Maharashtra tourism and local services
-        
-        WHAT'S IN THE DATABASE:
-        - Tourist attractions (places, sites, monuments, temples, forts, palaces, heritage sites, attractions, sightseeing spots, tourist destinations)
-        - Local businesses (hotels, restaurants, shops, tour guides, travel agencies)
-        - Emergency services (police stations, hospitals, fire stations)
-        - Districts and regions of Maharashtra
-        - Categories and classifications
-        
-        KEYWORDS FOR SQL_DB:
-        - Action words: list, show, find, where is, locate, get, give me, display, search, show me, tell me about
-        - Question words: how many, count, total, number of, which, what are
-        - Data words: contact, phone, email, address, location, details, information
-        - Domain words: tourist, tourism, place, places, attraction, monument, temple, fort, palace, heritage, site, business, restaurant, hotel, district
-        
-        EXAMPLES (route to SQL_DB):
-        - "List all tourist places"
-        - "Show me all tourist places"
-        - "Show tourist places"
-        - "Show me attractions in Pune"  
-        - "How many monuments are there?"
-        - "Count total places"
-        - "Find restaurants in Gondia"
-        - "Which tourist places are rated above 4?"
-        - "Show all businesses"
-        - "Contact details for police"
-   
-     2. KNOWLEDGE_BASE: Document-based queries about policies, processes, and how-to guides
-        
-        WHAT'S IN DOCUMENTS:
-        - Policy documents, procedures, regulations
-        - How-to guides, tutorials, explanations
-        - Process documentation
-        - Technical documentation, strategies, frameworks
-        
-        KEYWORDS FOR KNOWLEDGE_BASE:
-        - Question words: how to, what is, explain, describe, summarize
-        - Content words: policy, process, procedure, guide, documentation, strategies, mitigation, framework
-        
-        EXAMPLES (route to KNOWLEDGE_BASE):
-        - "How do I file a complaint?"
-        - "What is the privacy policy?"
-        - "Explain the onboarding process"
-        - "What are LLM security concerns?"
-        - "Mitigation strategies for prompt injection"
-   
-     3. GENERAL: Greetings, pleasantries, off-topic questions
-     
-     ROUTING RULES:
-      - If query mentions specific Maharashtra entities (names of districts like Pune, Nashik, or places like Aga Khan Palace, Saturday Wada) → SQL_DB
-      - If query asks about population, statistics, or counts of things in Maharashtra → SQL_DB
-      - If query asks for lists of hospitals, hotels, or offices in a district → SQL_DB
-      - If query asks for counts, lists, or filtering of structured data → SQL_DB
-      - If query asks about overall uploaded document content (policy, process, guide) → KNOWLEDGE_BASE  
-      - If query is conversational/greeting → GENERAL
-      
-      CRITICAL: For questions like "What is the population of Solapur?" or "Tell me about Pune", route to SQL_DB because they are factual lookups in the database.
-     
-     OUTPUT FORMAT:
-     STRICTLY Answer in the same language as the user Don't translate to english if not needed.
-     Return ONLY one word: "SQL_DB" or "KNOWLEDGE_BASE" or "GENERAL"
-     No explanation, just the classification.
-   
-   sql_generation_prompt: |
-     Generate PostgreSQL query. Rules:
-     - Limit 20 results unless specified otherwise
-     - Use ILIKE for text matching (case-insensitive)
-     - SELECT only relevant columns
-     - No DML (INSERT/UPDATE/DELETE)
-     Return ONLY SQL, no markdown.
+sql_generation_prompt: |
+  Generate PostgreSQL query. Rules:
+  - Limit 20 results unless specified otherwise
+  - Use ILIKE for text matching (case-insensitive)
+  - SELECT only relevant columns
+  - No DML (INSERT/UPDATE/DELETE)
+  Return ONLY SQL, no markdown.
 
 sql_synthesis_prompt: |
   You are a helpful assistant for the Amrut Chatbot. 

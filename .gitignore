@@ -15,3 +15,6 @@ list
 *.zip
 *.tar
 *.pem
+
+.DS_Store
+src/.DS_Store
