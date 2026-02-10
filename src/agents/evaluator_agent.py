@@ -33,7 +33,7 @@ def evaluator_agent(state: ResponseSchema) -> ResponseSchema:
     
     if state.get("retry_count", 0) > 3:
         return {
-            "query_response": "I don't know the answer to your question. Would you like to connect with an admin?",
+            "query_response": "I’m unable to help with this at the moment, but I’d be happy to connect you with an admin for further assistance.",
             "evaluation_state": "True",
             "needs_escalation": True  # Trigger escalation
         }
@@ -42,7 +42,7 @@ def evaluator_agent(state: ResponseSchema) -> ResponseSchema:
     # Check if response indicates no answer found
     if check_needs_escalation(query_response):
         return {
-            "query_response": "I don't know the answer to your question. Would you like to connect with an admin?",
+            "query_response": "I’m unable to help with this at the moment, but I’d be happy to connect you with an admin for further assistance.",
             "evaluation_state": "True",
             "needs_escalation": True  # Trigger escalation
         }
