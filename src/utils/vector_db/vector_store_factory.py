@@ -6,7 +6,7 @@ vector database implementation based on configuration.
 """
 
 from src.utils.vector_db.index_strategies.base import VectorIndexStrategy
-from settings import VECTOR_DB_TYPE
+from src.settings import VECTOR_DB_TYPE
 
 
 def create_vector_store(embeddings, db_type: str = None) -> VectorIndexStrategy:

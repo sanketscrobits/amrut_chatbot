@@ -1,5 +1,5 @@
 from fastapi import FastAPI, Request, Query, HTTPException, Response
-from settings import WHATSAPP_TOKEN, PHONE_NUMBER_ID
+from src.settings import WHATSAPP_TOKEN, PHONE_NUMBER_ID
 from src.Workflow.workflow import workflow
 import httpx
 import re

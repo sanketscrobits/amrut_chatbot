@@ -6,7 +6,7 @@ Provides persistent caching across server restarts.
 import redis
 from typing import Optional, Any
 import json
-from settings import DEBUG_MODE
+from src.settings import DEBUG_MODE
 import os
 
 # Redis Configuration

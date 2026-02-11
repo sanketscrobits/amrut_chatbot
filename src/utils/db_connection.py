@@ -21,7 +21,7 @@ class SupabaseDBPooled:
     def get_database(self) -> SQLDatabase:
         if self._db is None:
             # Lazy import to avoid circular dependencies
-            from settings import SUPABASE_DATABASE_URI
+            from src.settings import SUPABASE_DATABASE_URI
             
             if not SUPABASE_DATABASE_URI:
                 raise ValueError("SUPABASE_DATABASE_URI not set in environment")

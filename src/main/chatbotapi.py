@@ -10,7 +10,7 @@ from contextlib import asynccontextmanager
 from sse_starlette.sse import EventSourceResponse
 
 from src.Workflow.master_workflow import workflow
-from settings import NAMESPACE
+from src.settings import NAMESPACE
 from src.utils.vector_db.vector_store_factory import create_vector_store
 from langchain_huggingface import HuggingFaceEmbeddings
 from src.utils.db_connection import get_supabase_db

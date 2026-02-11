@@ -1,6 +1,6 @@
 from langgraph.graph import StateGraph, START, END
 from langchain_google_genai import ChatGoogleGenerativeAI
-from settings import GOOGLE_API_KEY 
+from src.settings import GOOGLE_API_KEY 
 from src.agents.evaluator_agent import evaluator_agent
 from src.agents.retriver_agent import retriver_agent
 from src.agents.response_enricher import response_enricher_node

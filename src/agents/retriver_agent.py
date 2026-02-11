@@ -2,7 +2,7 @@ from src.schemas.response_schema import ResponseSchema
 
 # OPTIMIZATION Phase 2: Query Expansion for better RAG recall
 from src.utils.query_expansion import expand_query_smart
-from settings import GOOGLE_API_KEY, ORGANIZATION_NAME, DEBUG_MODE
+from src.settings import GOOGLE_API_KEY, ORGANIZATION_NAME, DEBUG_MODE
 from src.utils.llm_singleton import get_llm
 from src.tools.query_tool import get_context
 from langchain_core.prompts import ChatPromptTemplate

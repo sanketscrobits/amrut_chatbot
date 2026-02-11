@@ -4,7 +4,7 @@ from pathlib import Path
 
 load_dotenv(".env")
 
-BASE_DIR = Path(__file__).resolve().parent.parent
+BASE_DIR = Path(__file__).resolve().parent.parent.parent
 
 GOOGLE_API_KEY=getenv("GEMINI_API_KEY")
 GEMINI_API_KEY=GOOGLE_API_KEY

@@ -1,4 +1,4 @@
-from settings import ORGANIZATION_NAME
+from src.settings import ORGANIZATION_NAME
 def create_query_agent(
     model="gemini-2.5-flash",
     temperature=0.1,

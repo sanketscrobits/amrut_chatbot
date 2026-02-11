@@ -6,7 +6,7 @@ Caches full chatbot responses to avoid recomputation.
 from src.utils.redis_client import get_cache, set_cache
 import hashlib
 import os
-from settings import DEBUG_MODE
+from src.settings import DEBUG_MODE
 
 # Configuration
 REDIS_TTL_RESPONSE = int(os.getenv("REDIS_TTL_RESPONSE", "900"))  # 15 minutes

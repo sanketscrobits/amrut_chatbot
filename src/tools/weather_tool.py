@@ -13,7 +13,7 @@ class WeatherTool:
         
         # Lazy import to avoid circular dependencies if settings imports this file
         try:
-            from settings import OPENWEATHER_API_KEY
+            from src.settings import OPENWEATHER_API_KEY
             self.api_key = api_key or OPENWEATHER_API_KEY
         except ImportError:
             self.api_key = api_key or os.getenv("OPENWEATHER_API_KEY")

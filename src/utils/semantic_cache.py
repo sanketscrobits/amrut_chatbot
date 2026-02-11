@@ -11,7 +11,7 @@ import numpy as np
 from langchain_huggingface import HuggingFaceEmbeddings
 from src.utils.redis_client import get_cache, set_cache
 import os
-from settings import DEBUG_MODE
+from src.settings import DEBUG_MODE
 
 # Configuration
 ENABLE_SEMANTIC_CACHE = os.getenv("ENABLE_SEMANTIC_CACHE", "true").lower() == "true"

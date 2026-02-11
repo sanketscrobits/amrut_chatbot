@@ -1,5 +1,5 @@
 from src.utils.vector_db.index_strategies.base import VectorIndexStrategy
-from settings import PINECONE_API_KEY, PINECONE_INDEX_NAME
+from src.settings import PINECONE_API_KEY, PINECONE_INDEX_NAME
 from pinecone import Pinecone
 
 class PineconeVectorIndex(VectorIndexStrategy):
