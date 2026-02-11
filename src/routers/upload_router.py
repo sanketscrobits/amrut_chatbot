@@ -6,7 +6,7 @@ import logging
 import os
 import tempfile
 
-from settings import NAMESPACE
+from src.settings import NAMESPACE
 from src.Uploader.uploader_pinecone import MyDocumentUploader
 
 logger = logging.getLogger(__name__)

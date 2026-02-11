@@ -2,7 +2,7 @@ from langchain_core.messages import HumanMessage, SystemMessage
 from src.schemas.response_schema import ResponseSchema
 from src.tools.weather_tool import check_weather
 from src.utils.llm_singleton import get_llm
-from settings import DEBUG_MODE
+from src.settings import DEBUG_MODE
 
 def weather_enricher_node(state: ResponseSchema) -> ResponseSchema:
     """

@@ -11,7 +11,7 @@ project_root = Path(__file__).resolve().parent.parent.parent
 if str(project_root) not in sys.path:
     sys.path.insert(0, str(project_root))
 
-from settings import NAMESPACE
+from src.settings import NAMESPACE
 from src.Uploader.uploader_pinecone import MyDocumentUploader
 from src.utils.escalation_manager import (
     list_pending_escalations,

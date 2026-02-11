@@ -28,14 +28,14 @@ class AsyncSupabaseDB:
     async def get_async_engine(self) -> AsyncEngine:
         """Get async engine for non-blocking database operations."""
         if self._async_engine is None:
-            from settings import SUPABASE_DATABASE_URI
+            from src.settings import SUPABASE_DATABASE_URI
             
             if not SUPABASE_DATABASE_URI:
                 raise ValueError("SUPABASE_DATABASE_URI not set in environment")
             
             # Convert to async URI
-            connection_uri = SUPABASE_DATABASE_URI.replace("postgres://", "postgresql+asyncpg://")
-            connection_uri = connection_uri.replace("postgresql://", "postgresql+asyncpg://")
+            connection_uri = SUPABASE_DATABASE_URI.replace("postgres://", "postgresql+psycopg://")
+            connection_uri = connection_uri.replace("postgresql://", "postgresql+psycopg://")
             
             # Remove unsupported 'supa' parameter
             if "supa=" in connection_uri:
@@ -76,7 +76,7 @@ class AsyncSupabaseDB:
     def get_database(self) -> SQLDatabase:
         """Get synchronous database (kept for backward compatibility)."""
         if self._db is None:
-            from settings import SUPABASE_DATABASE_URI
+            from src.settings import SUPABASE_DATABASE_URI
             
             if not SUPABASE_DATABASE_URI:
                 raise ValueError("SUPABASE_DATABASE_URI not set in environment")

@@ -10,7 +10,7 @@ from langchain_huggingface import HuggingFaceEmbeddings
 from src.utils.vector_db.loader_strategies.local_loader import LocalLoader
 from src.utils.vector_db.vector_store_factory import create_vector_store
 from src.utils.vector_db.vector_store_singleton import VectorStoreSingleton
-from settings import NAMESPACE
+from src.settings import NAMESPACE
 
 class MyDocumentUploader:
     def __init__(self):

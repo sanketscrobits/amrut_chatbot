@@ -20,7 +20,7 @@ class LLMSingleton:
         """
         if self._llm is None:
             # Lazy import to avoid circular dependencies
-            from settings import GOOGLE_API_KEY
+            from src.settings import GOOGLE_API_KEY
             
             self._llm = ChatGoogleGenerativeAI(
                 model=model,
@@ -38,7 +38,7 @@ def get_llm(model: str = "gemini-2.5-flash", temperature: float = 0) -> ChatGoog
     This function provides a non-streaming LLM instance.
     """
     global _llm_instance
-    from settings import GOOGLE_API_KEY # Ensure GOOGLE_API_KEY is available here
+    from src.settings import GOOGLE_API_KEY # Ensure GOOGLE_API_KEY is available here
 
     if _llm_instance is None:
         _llm_instance = ChatGoogleGenerativeAI(
@@ -54,7 +54,7 @@ def get_streaming_llm(model: str = "gemini-2.5-flash", temperature: float = 0) -
     Get a new streaming LLM instance.
     Streaming instances are not cached as singletons.
     """
-    from settings import GOOGLE_API_KEY # Ensure GOOGLE_API_KEY is available here
+    from src.settings import GOOGLE_API_KEY # Ensure GOOGLE_API_KEY is available here
 
     return ChatGoogleGenerativeAI(
         model=model,

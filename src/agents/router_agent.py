@@ -6,7 +6,7 @@ from langchain_core.output_parsers import StrOutputParser
 from src.schemas.response_schema import ResponseSchema
 from src.utils.llm_singleton import get_llm
 from src.utils.yaml_loader import load_prompts
-from settings import DEBUG_MODE
+from src.settings import DEBUG_MODE
 from src.agents.sql_template_cache import get_sql_from_template
 
 # REDIS INTEGRATION

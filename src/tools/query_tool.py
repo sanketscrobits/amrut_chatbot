@@ -3,7 +3,7 @@ from src.utils.vector_db.vector_store_singleton import VectorStoreSingleton
 from langchain_huggingface import HuggingFaceEmbeddings
 from src.utils.vector_db.loader_strategies.local_loader import LocalLoader
 from src.utils.vector_db.vector_store_factory import create_vector_store
-from settings import NAMESPACE, DEBUG_MODE
+from src.settings import NAMESPACE, DEBUG_MODE
 
 # Cache vector store instance to avoid recreation on every call
 _vector_store_cache = None

@@ -1,5 +1,5 @@
 from src.utils.vector_db.index_strategies.base import VectorIndexStrategy
-from settings import WEAVIATE_URL, WEAVIATE_API_KEY, WEAVIATE_COLLECTION_NAME
+from src.settings import WEAVIATE_URL, WEAVIATE_API_KEY, WEAVIATE_COLLECTION_NAME
 import weaviate
 from weaviate.classes.config import Configure, Property, DataType
 from weaviate.classes.query import Filter
