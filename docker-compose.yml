@@ -6,8 +6,6 @@ services:
     container_name: query-agent-web
     ports:
       - "8000:8000"
-    volumes:
-      - ./:/app
     environment:
       - PYTHONUNBUFFERED=1
 
@@ -17,7 +15,7 @@ services:
     depends_on:
       - weaviate
       - redis
-    command: uvicorn src.main.chatbotapi:app --host 0.0.0.0 --port 8000 --reload
+    command: uvicorn src.main.chatbotapi:app --host 0.0.0.0 --port 8000
 
   weaviate:
     image: semitechnologies/weaviate:1.27.0
