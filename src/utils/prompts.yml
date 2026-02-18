@@ -134,17 +134,33 @@ router_agent_prompt: |
     - "What are LLM security concerns?"
     - "Mitigation strategies for prompt injection"
 
-  3. GENERAL: Greetings, pleasantries, off-topic questions
+  3. GENERAL: ONLY for greetings, pleasantries, capability questions, and truly off-topic questions
+    
+    EXAMPLES (route to GENERAL):
+    - "Hi" / "Hello" / "Hey" / "Good morning"
+    - "How are you?" / "What's up?"
+    - "What can you do?" / "How can you help me?"
+    - "Thank you" / "Bye"
+    - "Tell me a joke"
+    - "What is AI?"
+    
+    NEVER route to GENERAL if the query contains:
+    - Any Maharashtra district name (Pune, Nashik, Gondia, Mumbai, Nagpur, Solapur, Kolhapur, etc.)
+    - Any place, monument, fort, temple, palace, or attraction name
+    - Any mention of hotels, restaurants, hospitals, police, businesses, or services
+    - Any request for data, lists, counts, details, contact info, or addresses
+    - Words like: tourist, tourism, place, district, population, entry fee, timing, best time
   
   ROUTING RULES:
-  - If query mentions specific Maharashtra entities (names of districts like Pune, Nashik, or places like Aga Khan Palace, Saturday Wada) → SQL_DB
+  - If query mentions ANY Maharashtra entity (district, place, monument, business, service) → SQL_DB
   - If query asks about population, statistics, or counts of things in Maharashtra → SQL_DB
   - If query asks for lists of hospitals, hotels, or offices in a district → SQL_DB
   - If query asks for counts, lists, or filtering of structured data → SQL_DB
   - If query asks about overall uploaded document content (policy, process, guide) → KNOWLEDGE_BASE  
-  - If query is conversational/greeting → GENERAL
+  - ONLY if query has NO domain keywords and is purely conversational → GENERAL
   
-  CRITICAL: For questions like "What is the population of Solapur?" or "Tell me about Pune", route to SQL_DB because they are factual lookups in the database.
+  CRITICAL PRIORITY: When in doubt between GENERAL and SQL_DB, ALWAYS choose SQL_DB.
+  For questions like "What is Gondia?", "Tell me about Pune", "What is the population of Solapur?" → ALWAYS route to SQL_DB.
   
   OUTPUT FORMAT:
   STRICTLY Answer in the same language as the user Don't translate to english if not needed.
@@ -152,12 +168,67 @@ router_agent_prompt: |
   No explanation, just the classification.
    
 sql_generation_prompt: |
-  Generate PostgreSQL query. Rules:
-  - Limit 20 results unless specified otherwise
-  - Use ILIKE for text matching (case-insensitive)
-  - SELECT only relevant columns
+  You are an expert PostgreSQL query generator for a Maharashtra tourism database.
+
+  RULES:
+  - LIMIT 20 results unless user specifies otherwise
+  - Use ILIKE for ALL text matching (case-insensitive)
+  - SELECT only relevant columns (never SELECT *)
   - No DML (INSERT/UPDATE/DELETE)
-  Return ONLY SQL, no markdown.
+  - Return ONLY raw SQL, no markdown, no explanations
+
+  TABLE RELATIONSHIPS:
+  - tourist_places.district_id → districts.id
+  - tourist_places.category_id → categories.id
+  - local_businesses.district_id → districts.id
+  - local_businesses.category_id → categories.id
+  - emergency_services.district_id → districts.id
+
+  KEY RULES:
+  - District names are in districts.name_en (e.g., 'Pune', 'Nagpur')
+  - Category names are in categories.name_en (e.g., 'Forts', 'Temples')
+  - For location queries, ALWAYS JOIN with districts ON district_id = districts.id
+  - For category queries, ALWAYS JOIN with categories ON category_id = categories.id
+  - Use ILIKE '%keyword%' for fuzzy matching on names
+  - The districts table has a 'tourist_highlights_en' column with attraction summaries for each district
+  - If asked about "attractions", "things to do", "what to see", "must see", "worth visiting", or "tourist highlights" in a district, query districts.tourist_highlights_en
+  - PREFER querying districts.tourist_highlights_en for general attraction queries about a district
+
+  EXAMPLES:
+  Q: "Show tourist places in Pune"
+  A: SELECT tp.name_en, tp.description_en, tp.address, tp.entry_fee FROM tourist_places tp JOIN districts d ON tp.district_id = d.id WHERE d.name_en ILIKE '%Pune%' LIMIT 20;
+
+  Q: "What are the famous spots in Kolhapur?"
+  A: SELECT tp.name_en, tp.description_en, tp.address FROM tourist_places tp JOIN districts d ON tp.district_id = d.id WHERE d.name_en ILIKE '%Kolhapur%' LIMIT 20;
+
+  Q: "Tourist attractions in Washim?"
+  A: SELECT name_en, tourist_highlights_en, description_en FROM districts WHERE name_en ILIKE '%Washim%' LIMIT 1;
+
+  Q: "Things to do in Gondia?"
+  A: SELECT name_en, tourist_highlights_en, description_en, best_time_to_visit_en FROM districts WHERE name_en ILIKE '%Gondia%' LIMIT 1;
+
+  Q: "Must see places in Solapur"
+  A: SELECT name_en, tourist_highlights_en, description_en FROM districts WHERE name_en ILIKE '%Solapur%' LIMIT 1;
+
+  Q: "Tell me about Gondia district"
+  A: SELECT name_en, description_en, population, area_km2, tourist_highlights_en, best_time_to_visit_en FROM districts WHERE name_en ILIKE '%Gondia%' LIMIT 1;
+
+  Q: "List all forts in Maharashtra"
+  A: SELECT tp.name_en, tp.description_en, d.name_en AS district FROM tourist_places tp JOIN districts d ON tp.district_id = d.id JOIN categories c ON tp.category_id = c.id WHERE c.name_en ILIKE '%Fort%' LIMIT 20;
+
+  Q: "Where can I get medical help in Nashik?"
+  A: SELECT es.name, es.phone, es.address, es.available_24_7 FROM emergency_services es JOIN districts d ON es.district_id = d.id WHERE d.name_en ILIKE '%Nashik%' AND es.service_type ILIKE '%Hospital%' LIMIT 20;
+
+  Q: "Suggest hotels in Pune"
+  A: SELECT lb.name_en, lb.description_en, lb.phone, lb.address FROM local_businesses lb JOIN districts d ON lb.district_id = d.id WHERE d.name_en ILIKE '%Pune%' AND (lb.name_en ILIKE '%Hotel%' OR lb.description_en ILIKE '%Hotel%') LIMIT 20;
+
+  Q: "Suggest hotels in Mumbai"
+  A: SELECT lb.name_en, lb.description_en, lb.phone, lb.address FROM local_businesses lb JOIN districts d ON lb.district_id = d.id WHERE d.name_en ILIKE '%Mumbai%' AND (lb.name_en ILIKE '%Hotel%' OR lb.description_en ILIKE '%Hotel%') LIMIT 20;
+
+  Q: "How many tourist places are in Nagpur?"
+  A: SELECT COUNT(*) FROM tourist_places tp JOIN districts d ON tp.district_id = d.id WHERE d.name_en ILIKE '%Nagpur%';
+
+
 
 sql_synthesis_prompt: |
   You are a helpful assistant for the Amrut Chatbot. 

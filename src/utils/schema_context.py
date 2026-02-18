@@ -83,21 +83,6 @@ CREATE TABLE local_businesses (
 	CONSTRAINT local_businesses_user_id_fkey FOREIGN KEY(user_id) REFERENCES auth.users (id) ON DELETE CASCADE
 )
 
-CREATE TABLE safety_alerts (
-	id UUID DEFAULT gen_random_uuid() NOT NULL, 
-	district_id UUID NOT NULL, 
-	title_en TEXT NOT NULL, 
-	title_mr TEXT NOT NULL, 
-	description_en TEXT NOT NULL, 
-	description_mr TEXT NOT NULL, 
-	severity TEXT NOT NULL, 
-	active BOOLEAN DEFAULT true, 
-	created_at TIMESTAMP WITHOUT TIME ZONE DEFAULT now(), 
-	updated_at TIMESTAMP WITHOUT TIME ZONE DEFAULT now(), 
-	CONSTRAINT safety_alerts_pkey PRIMARY KEY (id), 
-	CONSTRAINT safety_alerts_district_id_fkey FOREIGN KEY(district_id) REFERENCES districts (id) ON DELETE CASCADE, 
-	CONSTRAINT safety_alerts_severity_check CHECK (severity = ANY (ARRAY['low'::text, 'medium'::text, 'high'::text]))
-)
 
 CREATE TABLE tourist_places (
 	id UUID DEFAULT gen_random_uuid() NOT NULL, 

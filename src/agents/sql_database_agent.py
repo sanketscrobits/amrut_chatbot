@@ -42,10 +42,65 @@ def get_sql_prompts():
     prompts_path = os.path.join(current_dir, "..", "utils", "prompts.yml")
     return load_prompts(prompts_path)
 
+
+def _generate_sql_with_llm(llm, prompts: dict, schema: str, user_input: str) -> str:
+    """Generate SQL using LLM with the given schema."""
+    gen_prompt_str = prompts.get("sql_generation_prompt", "")
+    gen_prompt = ChatPromptTemplate.from_template(
+        gen_prompt_str + "\n\nSchema:\n{schema}\n\nQuestion: {question}"
+    )
+
+    generate_chain = (
+        RunnablePassthrough.assign(schema=lambda _: schema)
+        | gen_prompt
+        | llm
+        | StrOutputParser()
+    )
+
+    sql_query = generate_chain.invoke({"question": user_input})
+    return sql_query.strip().replace("```sql", "").replace("```", "").strip()
+
+
+def _execute_sql(db, sql_query: str) -> str:
+    """Execute SQL with timeout and validation."""
+    if "SELECT" not in sql_query.upper():
+        print("[SQL_AGENT] Invalid SQL generated (no SELECT)")
+        return ""
+
+    execute_tool = QuerySQLDataBaseTool(db=db)
+    with timeout(12):
+        return execute_tool.invoke(sql_query)
+
+
+def _is_empty_result(db_result) -> bool:
+    """Check if DB result is empty or meaningless."""
+    if not db_result:
+        return True
+    result_str = str(db_result).strip()
+    # Common empty patterns from SQL execution / SQLAlchemy / Supabase
+    empty_patterns = {
+        "", "[]", "()", "None", "none",
+        "[(0,)]", "[(None,)]", "[('',)]",
+        "[(0,)]", "((0,),)", "((None,),)",
+        "[(None, None)]", "[(None, None, None)]",
+        "[(None, None, None, None)]",
+        "[(None, None, None, None, None)]",
+        "[(None, None, None, None, None, None)]",
+        "[(None, None, None, None, None, None, None)]",
+    }
+    if result_str in empty_patterns:
+        return True
+    # Also check if the result only contains None values or empty strings
+    cleaned = result_str.replace("None", "").replace("(", "").replace(")", "").replace("[", "").replace("]", "").replace(",", "").replace("'", "").replace('"', "").strip()
+    if not cleaned:
+        return True
+    return False
+
+
 def query_database_chain(user_input: str):
     """
     Execute SQL Chain: Generate SQL -> Execute -> Synthesize
-    With 5-second total timeout to prevent hanging.
+    With LLM retry fallback when template SQL returns empty results.
     """
     t0 = time.time()
     try:
@@ -59,33 +114,23 @@ def query_database_chain(user_input: str):
             # 2. Generate SQL
             t1 = time.time()
             pruned_schema = ""
+            from_template = False
             
             # OPTIMIZATION: Try template cache first
             sql_query = get_sql_from_template(user_input)
             
-            if not sql_query:
+            if sql_query:
+                from_template = True
+            else:
                 # Template cache miss - use LLM generation
                 # OPTIMIZATION: Use pruned schema instead of full DB_SCHEMA_CONTEXT
                 pruned_schema = get_pruned_schema(user_input, enable_pruning=ENABLE_SCHEMA_PRUNING)
                 
-                gen_prompt_str = prompts.get("sql_generation_prompt", "")
-                gen_prompt = ChatPromptTemplate.from_template(
-                    gen_prompt_str + "\n\nSchema:\n{schema}\n\nQuestion: {question}"
-                )
-                    
-                generate_chain = (
-                    RunnablePassthrough.assign(schema=lambda _: pruned_schema)  # ← Using pruned schema
-                    | gen_prompt
-                    | llm
-                    | StrOutputParser()
-                )
-                
-                sql_query = generate_chain.invoke({"question": user_input})
-                sql_query = sql_query.strip().replace("```sql", "").replace("```", "")
+                sql_query = _generate_sql_with_llm(llm, prompts, pruned_schema, user_input)
             
             t2 = time.time()
             print(f"[SQL_AGENT] SQL Generated ({t2-t1:.2f}s): {sql_query}")
-            print(f"[SQL_AGENT] Pruned Schema Used: {pruned_schema[:200]}..." if ENABLE_SCHEMA_PRUNING else "[SQL_AGENT] Full schema used")
+            print(f"[SQL_AGENT] Source: {'template' if from_template else 'LLM'}")
             
             if "I don't know" in sql_query or not sql_query:
                 return ""
@@ -97,23 +142,27 @@ def query_database_chain(user_input: str):
                 print(f"[SQL_AGENT] Cache hit! Total time: {t_cache-t0:.2f}s")
                 return cached_result
 
-            # 3. Execute SQL with 12-second timeout (Supabase cold starts can take time)
-            execute_tool = QuerySQLDataBaseTool(db=db)
-            # Handle cases where LLM might return explanatory text
-            if "SELECT" not in sql_query.upper():
-                 print("Invalid SQL generated")
-                 return ""
-            
-            # Execute with timeout
-            with timeout(12):
-                db_result = execute_tool.invoke(sql_query)
+            # 3. Execute SQL
+            db_result = _execute_sql(db, sql_query)
             
             t3 = time.time()
             print(f"[SQL_AGENT] SQL Executed ({t3-t2:.2f}s)")
             print(f"[SQL_AGENT] Result Preview: {str(db_result)[:200]}...")
-            print(f"[SQL_AGENT] Result Length: {len(str(db_result))} chars")
             
-            if not db_result:
+            # 3b. FALLBACK: If template SQL returned empty, retry with LLM
+            if _is_empty_result(db_result) and from_template:
+                print(f"[SQL_AGENT] ⚡ Template SQL returned empty, retrying with LLM (full schema)...")
+                
+                # Use full schema so LLM can find the right table
+                sql_query = _generate_sql_with_llm(llm, prompts, DB_SCHEMA_CONTEXT, user_input)
+                
+                if sql_query and "I don't know" not in sql_query and "SELECT" in sql_query.upper():
+                    print(f"[SQL_AGENT] LLM retry SQL: {sql_query}")
+                    db_result = _execute_sql(db, sql_query)
+                    t3 = time.time()
+                    print(f"[SQL_AGENT] Retry result preview: {str(db_result)[:200]}...")
+            
+            if _is_empty_result(db_result):
                 return ""
 
             # 4. Synthesize Answer

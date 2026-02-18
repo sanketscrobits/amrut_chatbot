@@ -1,7 +1,3 @@
-"""
-General Agent - Handles conversational queries (greetings, small talk, capability questions)
-that do NOT require database or document context.
-"""
 from src.schemas.response_schema import ResponseSchema
 from src.utils.llm_singleton import get_llm
 from src.settings import ORGANIZATION_NAME, DEBUG_MODE

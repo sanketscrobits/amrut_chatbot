@@ -201,22 +201,31 @@ def get_pruned_schema(user_query: str, enable_pruning: bool = True) -> str:
     # Enhanced keyword mapping with more synonyms
     keyword_map = {
         "tourist_places": [
-            "tourist", "place", "places", "attraction", "monument", "temple",
+            "tourist", "place", "places", "attractions", "monument", "temple",
             "fort", "palace", "heritage", "site", "sightseeing", "visit",
-            "destination", "landmark", "historic", "cultural", "spot"
+            "destination", "landmark", "historic", "cultural", "spot",
+            "famous", "popular", "explore", "things to do", "must see",
+            "where to go", "what to see", "worth visiting", "travel",
+            "points of interest", "top places", "best places", "things to see",
+            "cave", "garden", "park", "dam", "lake", "beach", "waterfall",
+            "entry fee", "opening hours", "timing", "highlights", "attraction"
         ],
         "businesses": [
             "business", "hotel", "restaurant", "shop", "store", "cafe",
             "market", "mall", "shopping", "accommodation", "lodge", "resort",
-            "service", "vendor", "establishment", "commercial"
+            "service", "vendor", "establishment", "commercial",
+            "stay", "eat", "food", "dine", "booking", "homestay",
+            "guide", "taxi", "transport", "where to stay", "where to eat"
         ],
         "emergency": [
             "emergency", "police", "hospital", "ambulance", "fire",
-            "helpline", "medical", "doctor", "clinic", "health", "urgent"
+            "helpline", "medical", "doctor", "clinic", "health", "urgent",
+            "injury", "sick", "accident", "help", "rescue", "pharmacy",
+            "first aid", "911", "100", "108"
         ],
         "safety": [
             "alert", "safety", "warning", "danger", "caution", "risk",
-            "threat", "security", "safe", "hazard"
+            "threat", "security", "safe", "hazard", "flood", "cyclone"
         ]
     }
     
