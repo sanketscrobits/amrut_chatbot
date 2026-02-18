@@ -143,6 +143,10 @@ router_agent_prompt: |
     - "Thank you" / "Bye"
     - "Tell me a joke"
     - "What is AI?"
+    - "What is the capital of India?"
+    - "What is the color of a leaf?"
+    - "Who is the prime minister of India?"
+    - "What is the boiling point of water?"
     
     NEVER route to GENERAL if the query contains:
     - Any Maharashtra district name (Pune, Nashik, Gondia, Mumbai, Nagpur, Solapur, Kolhapur, etc.)
@@ -157,10 +161,12 @@ router_agent_prompt: |
   - If query asks for lists of hospitals, hotels, or offices in a district → SQL_DB
   - If query asks for counts, lists, or filtering of structured data → SQL_DB
   - If query asks about overall uploaded document content (policy, process, guide) → KNOWLEDGE_BASE  
+  - If query is general knowledge (e.g., world capitals, science facts, india-wide questions) → GENERAL
   - ONLY if query has NO domain keywords and is purely conversational → GENERAL
   
-  CRITICAL PRIORITY: When in doubt between GENERAL and SQL_DB, ALWAYS choose SQL_DB.
+  CRITICAL PRIORITY: When in doubt between GENERAL and SQL_DB **for Maharashtra entities**, choose SQL_DB.
   For questions like "What is Gondia?", "Tell me about Pune", "What is the population of Solapur?" → ALWAYS route to SQL_DB.
+  For questions like "What is the capital of India?", "What is a leaf?" → ALWAYS route to GENERAL.
   
   OUTPUT FORMAT:
   STRICTLY Answer in the same language as the user Don't translate to english if not needed.
