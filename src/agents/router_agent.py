@@ -143,8 +143,10 @@ def router_agent_node(state: ResponseSchema) -> ResponseSchema:
         # Map to data_source
         if decision == "SQL_DB":
             data_source = "sql"
+        elif decision == "GENERAL":
+            data_source = "general"
         else:
-            # Default to retriever for knowledge base and general
+            # Default to retriever for knowledge base
             data_source = "retriever"
         
         # OPTIMIZATION: Cache the decision with TTL

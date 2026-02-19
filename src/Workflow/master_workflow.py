@@ -8,6 +8,8 @@ from src.schemas.response_schema import ResponseSchema
 from src.agents.sql_database_agent import sql_agent_node
 from src.agents.weather_enricher import weather_enricher_node
 from src.agents.router_agent import router_agent_node
+from src.agents.general_agent import general_agent_node
+from src.agents.pre_processor import pre_processor_node
 
 model = ChatGoogleGenerativeAI(model="gemini-2.5-flash", google_api_key=GOOGLE_API_KEY)
 
@@ -33,6 +35,8 @@ def intent_routing_edge(state: ResponseSchema):
     source = state.get("data_source", "retriever")
     if source == "sql":
         return "sql_agent"
+    elif source == "general":
+        return "general_agent"
     return "retriver_agent"
 
 def sql_routing_edge(state: ResponseSchema):
@@ -82,7 +86,6 @@ def retriever_routing_edge(state: ResponseSchema):
     return "evaluator_agent"
 
 
-from src.agents.pre_processor import pre_processor_node
 
 def atomic_workflow(state: ResponseSchema) -> ResponseSchema:
     """
@@ -105,6 +108,10 @@ def atomic_workflow(state: ResponseSchema) -> ResponseSchema:
         if not state.get("query_response"):
             ret_res = retriver_agent(state)
             state.update(ret_res)
+    elif source == "general_agent":
+        # Direct LLM response for general/conversational queries
+        gen_res = general_agent_node(state)
+        state.update(gen_res)
     else:
         # Direct to Retriever
         ret_res = retriver_agent(state)

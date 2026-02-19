@@ -6,6 +6,16 @@ Provides fast SQL generation for common query patterns.
 import re
 from typing import Dict, Optional
 
+# List of valid Maharashtra districts (including aliases and common misspellings)
+VALID_DISTRICTS = {
+    "ahmednagar", "akola", "amravati", "aurangabad", "chhatrapati sambhajinagar", 
+    "beed", "bhandara", "buldhana", "chandrapur", "dhule", "gadchiroli", "gondia", 
+    "hingoli", "jalgaon", "jalna", "kolhapur", "latur", "mumbai", "mumbai city", 
+    "mumbai suburban", "nagpur", "nanded", "nandurbar", "nashik", "osmanabad", 
+    "dharashiv", "palghar", "parbhani", "pune", "raigad", "ratnagiri", "sangli", 
+    "satara", "sindhudurg", "solapur", "thane", "wardha", "washim", "yavatmal"
+}
+
 # EXPANDED: Template definitions (5 → 15+ templates)
 SQL_TEMPLATES = {
     # Original templates
@@ -264,9 +274,9 @@ QUERY_PATTERNS = [
         "extractor": lambda m: {"district": m.group(1).strip("?.! ")}
     },
     {
-        "pattern": r"(?:tell me about|describe|info on|details of|what is)\s+([a-zA-Z\s]+)",
-        "template": "get_place_description",
-        "extractor": lambda m: {"place": m.group(1).strip("?.! ")}
+        "pattern": r"(?:tell me about|describe|info on|details of|what is|i want to know about|what about)\s+([a-zA-Z\s]+)",
+        "template": "get_district_description",
+        "extractor": lambda m: {"district": m.group(1).strip("?.! ")}
     },
     
     # --- MEDIUM PRIORITY: ATTRIBUTES & COUNTS ---
@@ -278,17 +288,22 @@ QUERY_PATTERNS = [
     
     # Original patterns
     {
-        "pattern": r"(?:show|list|give|find).+(?:all|every).+(?:tourist place|attraction|monument|heritage|site|sightseeing)",
+        "pattern": r"(?:show|list|give|find|get|display).+(?:all|every).+(?:tourist place|attraction|monument|heritage|site|sightseeing|spot|destination)",
         "template": "list_all_places",
         "params": {"limit": 10}
     },
     {
-        "pattern": r"tourist place.+(?:in|near|at|located).+?(\w+)",
+        "pattern": r"(?:tourist place|famous (?:spot|place)|attraction|thing(?:s)? to (?:see|do|visit)|place(?:s)? to (?:visit|see|explore)|worth visiting|must see|point(?:s)? of interest|popular place|best place|top place|spot).+(?:in|near|at|around|of)\s+(\w+)",
         "template": "places_in_district",
         "extractor": lambda m: {"district": m.group(1).strip("?.! "), "limit": 10}
     },
     {
-        "pattern": r"(?:in|near|at|located).+?(\w+).+tourist place",
+        "pattern": r"(?:in|near|at|around).+?(\w+).+(?:tourist place|famous (?:spot|place)|attraction|thing(?:s)? to (?:see|do)|place(?:s)? to visit|spot)",
+        "template": "places_in_district",
+        "extractor": lambda m: {"district": m.group(1).strip("?.! "), "limit": 10}
+    },
+    {
+        "pattern": r"(?:what are|what's|suggest|recommend).+(?:famous|popular|best|top|interesting).+(?:in|near|at|around|of)\s+(\w+)",
         "template": "places_in_district",
         "extractor": lambda m: {"district": m.group(1).strip("?.! "), "limit": 10}
     },
@@ -332,7 +347,7 @@ QUERY_PATTERNS = [
     
     # NEW: Filtered place patterns
     {
-        "pattern": r"(?:show|list|find).*(?:forts?|monuments?|temples?|museums?|places?).+(?:in|at|of|near)\s+(\w+)",
+        "pattern": r"(?:show|list|find|get|suggest|recommend).*(?:forts?|monuments?|temples?|museums?|places?|spots?|destinations?|attractions?).+(?:in|at|of|near|around)\s+(\w+)",
         "template": "places_in_district",
         "extractor": lambda m: {"district": m.group(1).strip("?.! "), "limit": 10}
     },
@@ -371,7 +386,7 @@ QUERY_PATTERNS = [
         "extractor": lambda m: {"district": m.group(1).strip("?.! ")}
     },
     {
-        "pattern": r"(?:when should I visit|best month to visit|best time for)\s+([a-zA-Z\s]+)",
+        "pattern": r"(?:when should I (?:visit|go to|plan|travel)|best (?:month|season|time) (?:to visit|for)|ideal time (?:to visit|for)|when to (?:visit|go to|plan a trip))\s+([a-zA-Z\s]+)",
         "template": "get_best_time_visit_district",
         "extractor": lambda m: {"district": m.group(1).strip("?.! ")}
     },
@@ -398,21 +413,36 @@ QUERY_PATTERNS = [
     
     # Emergency
     {
-        "pattern": r"(hospitals?|pharmacies|police stations?|police).*(?:in|at|near)\s+(.+)",
+        "pattern": r"(hospitals?|pharmacies|police stations?|police|clinics?|doctors?).*(?:in|at|near|around)\s+(.+)",
         "template": "list_services_in_district",
         "extractor": lambda m: {"service_type": singularize(m.group(1)), "district": m.group(2).strip("?.! ")}
     },
     {
-        "pattern": r"emergency.*(?:contact|number|phone|helpline).*(?:for|of)\s+(.+)",
+        "pattern": r"(?:where can i (?:get|find)|i need).*(?:medical|health|doctor|hospital|police|emergency).*(?:in|at|near|around)\s+(\w+)",
+        "template": "list_services_in_district",
+        "extractor": lambda m: {"service_type": "Hospital", "district": m.group(1).strip("?.! ")}
+    },
+    {
+        "pattern": r"emergency.*(?:contact|number|phone|helpline).*(?:for|of|in)\s+(.+)",
         "template": "get_service_contact",
         "extractor": lambda m: {"name": m.group(1).strip("?.! ")}
     },
     
     # Businesses
     {
-        "pattern": r"(hotels?|restaurants?|taxis?|lodges?).*(?:in|at|near)\s+(.+)",
+        "pattern": r"(hotels?|restaurants?|taxis?|lodges?|homestays?|resorts?|cafes?).*(?:in|at|near|around)\s+(.+)",
         "template": "list_businesses_in_district",
         "extractor": lambda m: {"category": singularize(m.group(1)), "district": m.group(2).strip("?.! ")}
+    },
+    {
+        "pattern": r"(?:where (?:can i|to)|suggest|recommend).*(?:eat|dine|food|lunch|dinner|breakfast).*(?:in|at|near|around)\s+(\w+)",
+        "template": "list_businesses_in_district",
+        "extractor": lambda m: {"category": "Restaurant", "district": m.group(1).strip("?.! ")}
+    },
+    {
+        "pattern": r"(?:where (?:can i|to)|suggest|recommend).*(?:stay|sleep|hotel|lodge|resort|accommodation).*(?:in|at|near|around)\s+(\w+)",
+        "template": "list_businesses_in_district",
+        "extractor": lambda m: {"category": "Hotel", "district": m.group(1).strip("?.! ")}
     },
      {
         "pattern": r"(?:contact|phone).*(?:number|details).*(?:for|of)\s+(.+)",
@@ -478,6 +508,38 @@ def get_sql_from_template(query: str) -> Optional[str]:
             if "extractor" in pattern_config:
                 try:
                     params = pattern_config["extractor"](match)
+                    
+                    # VALIDATION: If 'district' param exists, verify it's a valid Maharashtra district
+                    # This prevents "What is the capital of India" from matching "district" -> "the capital of India"
+                    if "district" in params:
+                        district_val = params["district"].lower()
+                        # Simple inclusion check (can be fuzzy matched if needed, but strict is safer for routing)
+                        # We check if any valid district is a substring of the extracted value OR vice versa
+                        is_valid = False
+                        
+                        # 1. Check if extracted value is exactly a valid district (or alias)
+                        if district_val in VALID_DISTRICTS:
+                            is_valid = True
+                        else:
+                            # 2. Check if a valid district is inside the extracted text (e.g. "pune district")
+                            for vd in VALID_DISTRICTS:
+                                if vd in district_val:
+                                    # Update params to use the clean district name
+                                    params["district"] = vd
+                                    is_valid = True
+                                    break
+                        
+                        if not is_valid:
+                            # 3. Check if extracted text is inside a valid district (e.g. "mumbai" in "mumbai suburban")
+                            for vd in VALID_DISTRICTS:
+                                if district_val in vd:
+                                    params["district"] = vd
+                                    is_valid = True
+                                    break
+                        
+                        if not is_valid:
+                            # print(f"⚠️ Validation Failed: '{params['district']}' is not a valid district. Skipping template.")
+                            continue
                 except Exception:
                     # If extraction fails, skip this pattern
                     continue
