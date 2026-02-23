@@ -25,6 +25,7 @@ from src.utils.escalation_manager import (
 from src.routers.admin_router import admin_router
 from src.routers.upload_router import upload_router
 from src.utils.llm_singleton import get_streaming_llm
+from src.utils.langfuse_config import get_langfuse_callback, get_langfuse_client
 
 # Initialize vector store using factory pattern
 vector_store = None
@@ -63,7 +64,14 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         print(f"[STARTUP] ⚠️  Failed to start DB pre-warm task: {e}")
     yield
-    # Cleanup if needed
+    # Cleanup: flush any pending Langfuse events before shutdown
+    try:
+        langfuse_client = get_langfuse_client()
+        if langfuse_client:
+            langfuse_client.flush()
+            print("[SHUTDOWN] ✅ Langfuse events flushed.")
+    except Exception as e:
+        print(f"[SHUTDOWN] ⚠️ Langfuse flush failed: {e}")
 
 app = FastAPI(title="Amrut Chatbot API", description="Chatbot with admin escalation support", lifespan=lifespan)
 
@@ -111,6 +119,7 @@ async def chatbot_endpoint(request: ChatRequest):
     
     try:
         user_input = request.user_message
+        start_time = time.time()
         
         # Validate query is not empty
         if not user_input or not user_input.strip():
@@ -128,14 +137,41 @@ async def chatbot_endpoint(request: ChatRequest):
         
         print(f"User message: {user_input}")
         
+        # -- Langfuse: create a per-request callback handler (v3: no-arg constructor) --
+        langfuse_handler = get_langfuse_callback()
+        
         # PHASE 7: Semantic caching - find semantically similar queries
         cached_response = get_semantic_cached_response(user_input)
         if cached_response:
+            # -- Langfuse: record cache hit on the active trace --
+            lf = get_langfuse_client()
+            if lf:
+                try:
+                    lf.update_current_trace(
+                        input=user_input,
+                        output=cached_response.get("response", ""),
+                        metadata={"cache_hit": True, "cache_type": "semantic"},
+                        tags=["chatbot", "cache-hit"],
+                    )
+                except Exception:
+                    pass
             return ChatResponse(**cached_response)
         
         # Fallback to exact match cache
         cached_response = get_cached_response(user_input)
         if cached_response:
+            # -- Langfuse: record cache hit on the active trace --
+            lf = get_langfuse_client()
+            if lf:
+                try:
+                    lf.update_current_trace(
+                        input=user_input,
+                        output=cached_response.get("response", ""),
+                        metadata={"cache_hit": True, "cache_type": "exact"},
+                        tags=["chatbot", "cache-hit"],
+                    )
+                except Exception:
+                    pass
             return ChatResponse(**cached_response)
 
         initial_state = {
@@ -149,7 +185,13 @@ async def chatbot_endpoint(request: ChatRequest):
             "needs_escalation": False
         }
 
-        final_state = workflow.invoke(initial_state, config={"verbose": True})
+        # -- Langfuse: pass callback handler so every LangGraph node and
+        #    LLM call is automatically traced as a child span. --
+        lf_callbacks = [langfuse_handler] if langfuse_handler else []
+        final_state = workflow.invoke(
+            initial_state,
+            config={"verbose": True, "callbacks": lf_callbacks}
+        )
         print("Workflow final state:", final_state)
 
         query_response = final_state.get("query_response", "No response generated.")
@@ -201,6 +243,24 @@ async def chatbot_endpoint(request: ChatRequest):
             "escalation_id": escalation_id,
             "websocket_url": websocket_url
         }
+        
+        # -- Langfuse: enrich the root trace with per-request metadata --
+        lf = get_langfuse_client()
+        if lf:
+            try:
+                lf.update_current_trace(
+                    input=user_input,
+                    output=answer,
+                    metadata={
+                        "cache_hit": False,
+                        "escalation_required": needs_escalation,
+                        "data_source": final_state.get("data_source", ""),
+                        "latency_ms": round((time.time() - start_time) * 1000, 2),
+                    },
+                    tags=["chatbot", "production"],
+                )
+            except Exception:
+                pass
         
         # PHASE 7: Cache with semantic indexing
         cache_semantic_response(user_input, response_data, ttl=900)
@@ -260,11 +320,15 @@ async def chatbot_stream_endpoint(request: ChatRequest):
     async def event_generator():
         try:
             user_input = request.user_message
+            start_time = time.time()
             
             # Helper to format SSE message
             def format_sse(data):
                 return {"event": "message", "data": json.dumps(data)}
             
+            # -- Langfuse: create a per-request callback handler (v3: no-arg) --
+            langfuse_handler = get_langfuse_callback()
+
             # 1. Check Cache First (Instant Response)
             # ---------------------------------------
             # Try semantic cache first
@@ -274,6 +338,18 @@ async def chatbot_stream_endpoint(request: ChatRequest):
                 cached_response = get_cached_response(user_input)
                 
             if cached_response:
+                # -- Langfuse: record cache hit on active trace --
+                lf = get_langfuse_client()
+                if lf:
+                    try:
+                        lf.update_current_trace(
+                            input=user_input,
+                            output=cached_response.get("response", ""),
+                            metadata={"cache_hit": True},
+                            tags=["chatbot-stream", "cache-hit"],
+                        )
+                    except Exception:
+                        pass
                 # If cached, stream it as a single chunk (effectively instant)
                 response_text = cached_response.get("response", "")
                 yield format_sse({"token": response_text, "done": True, "cached": True})
@@ -302,9 +378,19 @@ async def chatbot_stream_endpoint(request: ChatRequest):
                 "needs_escalation": False
             }
             
+            # -- Langfuse: pass callback handler so every LangGraph node / LLM
+            #    call is automatically traced as a child span. --
+            lf_callbacks = [langfuse_handler] if langfuse_handler else []
+            
             # Run workflow (awaiting full execution)
             Loop = asyncio.get_event_loop()
-            final_state = await Loop.run_in_executor(None, workflow.invoke, initial_state)
+            final_state = await Loop.run_in_executor(
+                None,
+                lambda: workflow.invoke(
+                    initial_state,
+                    config={"callbacks": lf_callbacks}
+                )
+            )
             
             query_response = final_state.get("query_response", "No response generated.")
             
@@ -322,6 +408,24 @@ async def chatbot_stream_endpoint(request: ChatRequest):
                          answer = str(query_response)[start_idx:].split("',")[0].strip()
             
             answer = str(answer).replace("'", "").strip().strip("'").strip()
+            
+            # -- Langfuse: enrich root trace with per-request metadata --
+            lf = get_langfuse_client()
+            if lf:
+                try:
+                    lf.update_current_trace(
+                        input=user_input,
+                        output=answer,
+                        metadata={
+                            "cache_hit": False,
+                            "escalation_required": final_state.get("needs_escalation", False),
+                            "data_source": final_state.get("data_source", ""),
+                            "latency_ms": round((time.time() - start_time) * 1000, 2),
+                        },
+                        tags=["chatbot-stream", "production"],
+                    )
+                except Exception:
+                    pass
             
             # Stream the result token by token (Simulated for UX)
             # In a real full-async refactor, we would stream directly from the LLM

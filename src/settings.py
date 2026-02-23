@@ -40,3 +40,8 @@ NAMESPACE = getenv("NAMESPACE")
 
 # Performance & Debugging Configuration
 DEBUG_MODE = True
+
+# Langfuse Observability Configuration
+LANGFUSE_SECRET_KEY = getenv("LANGFUSE_SECRET_KEY")
+LANGFUSE_PUBLIC_KEY = getenv("LANGFUSE_PUBLIC_KEY")
+LANGFUSE_BASE_URL = getenv("LANGFUSE_BASE_URL", "https://cloud.langfuse.com")
